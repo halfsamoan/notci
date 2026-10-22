@@ -7,7 +7,7 @@ Ubuntu GNOME 50 상단 패널 아래의 Dynamic Island 노치에 **카카오톡 
 - **Spotify**: 재생 중이면 섬 오른쪽에 앨범 아트(20px)와 파형 4개가 작게 보입니다. 곡이 바뀌면 3초 동안 펼쳐져(464×168) 아트·제목·아티스트·진행 막대·이전/재생/다음을 보여 주고, 작은 아트를 누르면 언제든 펼칩니다. 앨범 색은 파형·아티스트·진행 막대에만 쓰이고 배경은 늘 검정입니다.
 - **카카오톡**: 메시지가 오면 5초 동안 카드(464×96)가 펼쳐집니다. 보낸 사람·내용(두 줄)·프로필 사진, 노란 말풍선 배지. 마우스를 올리면 유지되고, 누르면 카카오톡 창을 앞으로 가져오며, 바깥 클릭이나 Esc로 닫습니다. 출처는 둘입니다.
   - 휴대폰(GSConnect): `gnome-extensions enable gsconnect@andyholmes.github.io` 후 휴대폰 KDE Connect와 페어링하고 알림 동기화에서 카카오톡을 허용합니다. 카카오톡은 PC 클라이언트를 쓰는 동안 휴대폰 알림을 3~10분 보류하므로, PC 카톡이 활성일 때는 아래 경로가 담당합니다.
-  - PC 카카오톡(Wine): 카카오톡 PC는 D-Bus 알림을 내지 않고 자체 팝업 창을 그립니다. `kakaotalk-compat`의 `kakao-activate.exe --watch`가 팝업을 감지해 Win32 접근성 API(MSAA)가 노출하는 보낸 사람·내용을 `org.freedesktop.Notifications`로 전달하면 notci가 받아 섬에 그립니다.
+  - PC 카카오톡(Wine): 카카오톡 PC는 D-Bus 알림을 내지 않고 자체 팝업 창을 그립니다. notci는 `desktop-entry=wine-Programs-카카오톡` 힌트가 붙은 `org.freedesktop.Notifications` 알림을 PC 메시지로 받습니다(`notify-send -a KakaoTalk -h string:desktop-entry:wine-Programs-카카오톡 '보낸이' '내용'`으로 시험 가능). 팝업 창을 감지해 보낸 사람·내용을 이 형식으로 전달하는 Wine 쪽 브리지(`kakaotalk-compat`의 `kakao-activate.exe`)는 `--probe`로 팝업의 창 클래스·크기·접근성 텍스트를 먼저 기록한 뒤(`~/.cache/notci@local/probe.log`) 그 결과에 맞춰 `--watch`에 붙입니다. 텍스트를 읽을 수 없으면 팝업 창 자체를 섬 안에 비추는 경로(`POPUP_FINGERPRINT`)를 켭니다.
 
 ## 프라이버시
 
