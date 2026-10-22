@@ -72,7 +72,7 @@ export class SpotifyModule {
             onShellShutdown: () => this._beginShellShutdown()});
         this._connect(this.root, 'notify::mapped', () => this._updateBars());
         this._connect(Main.layoutManager, 'monitors-changed', () => { this._updateBars(); this._visibility(); });
-        this._connect(global.display, 'in-fullscreen-changed', () => this._updateBars());
+        this._connect(global.display, 'in-fullscreen-changed', () => { this._updateBars(); this._visibility(); });
         this._connect(St.Settings.get(), 'notify::enable-animations', () => this._updateBars());
         this._connect(Main.sessionMode, 'updated', () => { this._updateBars(); this._visibility(); });
         this._connect(Main.overview, 'showing', () => { this.collapse(); this._visibility(); });
@@ -115,7 +115,11 @@ export class SpotifyModule {
         this._status = playing ? 'Playing' : 'Paused';
         this._canNext = this._canPrev = true;
         this._position = {positionUs, atUs: GLib.get_monotonic_time()};
-        if (artFile) this._artFile = artFile;
+        if (artFile) {
+            this._artFile = artFile;
+            const [ok, bytes] = GLib.file_get_contents(artFile);
+            if (ok) this._accentFor(artFile, GLib.Bytes.new(bytes)).then(accent => { this._accent = accent; this._redraw(); });
+        }
         this._render();
         this._syncTick();
     }
@@ -356,7 +360,8 @@ export class SpotifyModule {
     _visibility() {
         if (this._shellEnding || !this._dock) return;
         const expanded = this._expanded;
-        const visible = this._visible() && !Main.overview.visible && !Main.sessionMode.isLocked;
+        const visible = this._visible() && !Main.overview.visible && !Main.sessionMode.isLocked &&
+            !Main.layoutManager.primaryMonitor?.inFullscreen;
         this._dock.update({width: expanded ? DESIGN.geometry.expandedWide : DESIGN.geometry.spotifyCompact,
             height: expanded ? this._expandedHeight ?? DESIGN.geometry.spotifyExpandedHeight :
                 this._compactHeight ?? DESIGN.control.compactHeight,
