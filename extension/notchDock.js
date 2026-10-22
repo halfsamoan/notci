@@ -27,7 +27,7 @@ function layoutSourceHash() {
         pointInNotchShape, isPointWithinNotch, notchGeometry, createNotchSurface,
         classifyOutsideSurface, shouldDismissOutside, dispatchOutsideDismiss,
         eventCoordinates, buttonNumber, animationsEnabled, clearMorph, allocationFor, easeOnCurve, morph,
-        hideSlab, showSlab, slabFor, destroySlabs, attach, detach, placeContent,
+        hideSlab, showSlab, slabFor, destroySlabs, attach, detach, placeContent, monitorKey, keepOnStage,
         insideActiveSurface, getDock, DockParticipant]
         .map(fn => typeof fn === 'string' ? fn : fn.toString()).join('|');
     for (const char of `${contract}|capture-dismiss-v5|island-v1`) {
@@ -174,6 +174,22 @@ function slabFor(dock, key) {
     }
 }
 
+function monitorKey(monitor) {
+    return `${monitor.x}:${monitor.y}:${monitor.width}`;
+}
+
+// Content lives inside the (hidden) slab from the start, so a module can measure its
+// tree with real CSS before it asks to be shown.
+function keepOnStage(dock, participant) {
+    let monitor = null;
+    try { monitor = participant.monitor(); } catch (_error) {}
+    if (!monitor || dock.shuttingDown) return;
+    const slab = slabFor(dock, monitorKey(monitor));
+    if (!slab) return;
+    attach(slab, participant);
+    participant.slabKey = slab.key;
+}
+
 function destroySlabs(dock) {
     for (const slab of dock.slabs.values()) {
         try { Main.layoutManager.removeChrome(slab.surface); } catch (_error) {}
@@ -317,10 +333,11 @@ function getDock() {
                 try { monitor = participant.monitor(); } catch (_error) {}
                 participant.lastFallback = false;
                 if (!monitor || !participant.state.visible) {
+                    keepOnStage(this, participant);
                     placeContent(this, null, participant, null, null);
                     continue;
                 }
-                const key = `${monitor.x}:${monitor.y}:${monitor.width}`;
+                const key = monitorKey(monitor);
                 if (!groups.has(key)) groups.set(key, {monitor, entries: []});
                 groups.get(key).entries.push({id: participant.id, ...participant.state,
                     order: participant.order, active: this.active?.id === participant.id});
@@ -408,6 +425,7 @@ export class DockParticipant {
             console.warn(`[notchDock] shared layout source differs; owner=${this.dock.owner}, protocol=${this.dock.protocol}`);
         }
         this.dock.participants.set(id, this);
+        keepOnStage(this.dock, this);
     }
 
     claim(priority = 100) {

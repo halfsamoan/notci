@@ -45,3 +45,4 @@
 .notci-avatar { width: 44px; height: 44px; border-radius: 22px; background-color: rgba(255, 255, 255, 0.12); }
 .notci-avatar-badge { width: 16px; height: 16px; border-radius: 8px; background-color: #fee500; color: #000000; }
 .notci-kakao-badge { color: #000000; background-color: #fee500; font-size: 8.25pt; font-weight: 700; padding: 1px 6px; border-radius: 999px; }
+.notci-kakao .notci-card:focus { border-radius: 16px; box-shadow: inset 0 0 0 2px #0a84ff; }
