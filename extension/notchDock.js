@@ -28,9 +28,9 @@ function layoutSourceHash() {
         classifyOutsideSurface, shouldDismissOutside, dispatchOutsideDismiss,
         eventCoordinates, buttonNumber, animationsEnabled, clearMorph, allocationFor, easeOnCurve, morph,
         hideSlab, showSlab, slabFor, destroySlabs, attach, detach, placeContent, monitorKey, keepOnStage,
-        insideActiveSurface, getDock, DockParticipant]
+        dismissOnFocusChange, insideActiveSurface, getDock, DockParticipant]
         .map(fn => typeof fn === 'string' ? fn : fn.toString()).join('|');
-    for (const char of `${contract}|capture-dismiss-v5|island-v1`) {
+    for (const char of `${contract}|capture-dismiss-v6|island-v1`) {
         hash ^= char.charCodeAt(0);
         hash = Math.imul(hash, 16777619);
     }
@@ -43,9 +43,31 @@ function disconnectCapture(dock) {
         if (dock.captureId) dock.captureStage.disconnect(dock.captureId);
         if (dock.stageDestroyId) dock.captureStage.disconnect(dock.stageDestroyId);
     } catch (_error) { /* stage is already being destroyed */ }
+    try {
+        if (dock.focusId) global.display.disconnect(dock.focusId);
+    } catch (_error) {}
     dock.captureStage = null;
     dock.captureId = 0;
     dock.stageDestroyId = 0;
+    dock.focusId = 0;
+}
+
+// Giving an app window focus (click, Alt+Tab, launch) counts as tapping outside the island.
+// Focus moving to nothing is ignored: that is the island itself taking the keyboard.
+function dismissOnFocusChange(dock) {
+    if (dock.shuttingDown) return;
+    let window = null;
+    try { window = global.display.focus_window; } catch (_error) {}
+    if (!window || window === dock.focusWindow) {
+        if (window) dock.focusWindow = window;
+        return;
+    }
+    dock.focusWindow = window;
+    const owner = dock.active && dock.participants.get(dock.active.id);
+    if (!owner || !owner.state.visible || !owner.state.expanded) return;
+    try { owner.onOutside?.(); } catch (error) {
+        console.warn(`[notchDock] focus-change dismissal failed: ${error.message}`);
+    }
 }
 
 function eventCoordinates(event) {
@@ -395,6 +417,8 @@ function getDock() {
         return Clutter.EVENT_PROPAGATE;
     });
     dock.stageDestroyId = dock.captureStage.connect('destroy', () => dock.shutdown());
+    try { dock.focusWindow = global.display.focus_window; } catch (_error) { dock.focusWindow = null; }
+    dock.focusId = global.display.connect('notify::focus-window', () => dismissOnFocusChange(dock));
     Main.layoutManager[KEY] = dock;
     return dock;
 }

@@ -9,8 +9,8 @@
 .notci-compact-module:active { background-color: {{color.pressedWash}}; }
 .notci-compact-module:focus { background-color: {{color.hoverWash}}; box-shadow: inset 0 0 0 2px {{color.focus}}; }
 
-/* Expanded card: 10/16/10 insets, concentric with the 22 px slab corner. */
-.notci-card { padding: 10px 16px 10px; spacing: 6px; }
+/* Expanded card: 10/16/12 insets (shared with Archsport and matci), concentric with the 22 px slab corner. */
+.notci-card { padding: 10px 16px 12px; spacing: 6px; }
 .notci-card-row { spacing: {{spacing.md}}px; }
 .notci-card-column { spacing: 2px; }
 .notci-title { color: {{color.labelPrimary}}; font-size: {{typography.primary}}px; font-weight: 600; }
