@@ -18,9 +18,12 @@ const APP_ID = 'wine-Programs-카카오톡.desktop';
 const PRIORITY = 60;
 const RETRY_MS = 2000;
 const BODY_LINES = 2;
-// K2: KakaoTalk's own popup window mirrored into the island. Set {minWidth, maxWidth, minHeight,
-// maxHeight} once the popup size is known; null keeps the window watcher inactive.
-const POPUP_FINGERPRINT = null;
+// K2: KakaoTalk's own popup window mirrored into the island. Probed 2026-10-22 on Wine 10 /
+// XWayland: an untitled NORMAL window, _NET_WM_STATE_ABOVE + SKIP_TASKBAR, no decorations,
+// 310×130, sliding in over ~300 ms (height 8 → 130) and drawn above the screen top where the
+// user never sees it. null would keep the watcher inactive.
+const POPUP_FINGERPRINT = {minWidth: 290, maxWidth: 330, minHeight: 90, maxHeight: 170};
+const POPUP_SETTLE_MS = 400;
 
 function kakaoApp() {
     return Shell.AppSystem.get_default().lookup_app(APP_ID);
@@ -334,13 +337,16 @@ export class KakaoModule {
     // delete this block once the text bridge makes it redundant. ----
     _onWindowCreated(window) {
         if (!POPUP_FINGERPRINT || !this._showBody() || this._settings.get_string('kakao-source') === 'phone') return;
-        if (window.get_wm_class() !== 'kakaotalk.exe' || window.get_window_type() !== Meta.WindowType.OVERRIDE_OTHER ||
-            window.get_title() !== '') return;
-        window.connectObject('shown', () => {
+        if (window.get_wm_class() !== 'kakaotalk.exe' || window.get_window_type() !== Meta.WindowType.NORMAL ||
+            window.get_title() !== '' || !window.is_above() || !window.is_skip_taskbar()) return;
+        // The popup slides in; measure after it has settled, not at the first map.
+        window.connectObject('shown', () => GLib.timeout_add(GLib.PRIORITY_DEFAULT, POPUP_SETTLE_MS, () => {
+            if (!this._dock || !window.get_compositor_private()) return GLib.SOURCE_REMOVE;
             const {width, height} = window.get_frame_rect();
             const f = POPUP_FINGERPRINT;
             const actor = window.get_compositor_private();
-            if (!actor || width < f.minWidth || width > f.maxWidth || height < f.minHeight || height > f.maxHeight) return;
+            if (!actor || width < f.minWidth || width > f.maxWidth || height < f.minHeight || height > f.maxHeight)
+                return GLib.SOURCE_REMOVE;
             actor.opacity = 0;
             this._hiddenPopups.add(actor);
             const event = messageEvent({source: 'pc'});
@@ -355,7 +361,8 @@ export class KakaoModule {
             }, this);
             this._queue.push(event);
             this._showNext();
-        }, this);
+            return GLib.SOURCE_REMOVE;
+        }), this);
     }
 
     destroy() {
