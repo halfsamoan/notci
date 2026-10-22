@@ -1,0 +1,13 @@
+{
+  "uuid": "notci@local",
+  "name": "notci",
+  "description": "Dynamic Island 노치: 카카오톡 메시지 미리보기와 Spotify 재생 정보",
+  "shell-version": [
+    "50"
+  ],
+  "version": 1,
+  "settings-schema": "org.gnome.shell.extensions.notci",
+  "session-modes": [
+    "user"
+  ]
+}

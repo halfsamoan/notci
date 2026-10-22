@@ -1,0 +1,110 @@
+{
+  "spacing": {
+    "xxs": 2,
+    "xs": 4,
+    "sm": 8,
+    "md": 12,
+    "lg": 16,
+    "xl": 24,
+    "between": 20,
+    "compactGap": 12
+  },
+  "radius": {
+    "surface": 22,
+    "control": 12
+  },
+  "color": {
+    "surfacePrimary": "#000000",
+    "surfaceElevated": "rgba(255, 255, 255, 0.14)",
+    "labelPrimary": "#ffffff",
+    "labelSecondary": "#a1a1a6",
+    "labelTertiary": "#8e8e93",
+    "separatorSubtle": "rgba(255, 255, 255, 0.08)",
+    "focus": "#0a84ff",
+    "accentPositive": "#30d158",
+    "accentWarning": "#ff9f0a",
+    "accentCritical": "#ff453a",
+    "surfaceHover": "rgba(255, 255, 255, 0.18)",
+    "surfacePressed": "rgba(255, 255, 255, 0.24)",
+    "surfaceTrack": "rgba(255, 255, 255, 0.12)",
+    "hoverWash": "rgba(255, 255, 255, 0.08)",
+    "pressedWash": "rgba(255, 255, 255, 0.14)",
+    "actionPrimary": "#0a84ff",
+    "actionHover": "#0077ed",
+    "labelDisabled": "#838b97",
+    "surfacePrimaryLight": "#f7f7f9",
+    "surfaceElevatedLight": "#e9e9ed",
+    "labelPrimaryLight": "#18191c",
+    "labelSecondaryLight": "#4b4d54",
+    "labelTertiaryLight": "#62656d",
+    "hoverWashLight": "rgba(0, 0, 0, 0.06)",
+    "separatorLight": "rgba(0, 0, 0, 0.08)",
+    "accentWarningLight": "#8a4b00",
+    "accentCriticalLight": "#b42318",
+    "focusLight": "#0057b8",
+    "actionPrimaryFill": "#0066cc",
+    "actionPrimaryFillHover": "#005bb5",
+    "criticalFill": "#c8102e",
+    "criticalFillHover": "#a50d26",
+    "brandKakao": "#fee500",
+    "brandSpotify": "#1db954"
+  },
+  "motion": {
+    "micro": 100,
+    "response": 160,
+    "secondaryDelay": 90,
+    "expand": 240,
+    "collapse": 185,
+    "event": 210,
+    "expandMode": "EASE_OUT_QUART",
+    "collapseMode": "EASE_OUT_CUBIC",
+    "primaryDelay": 60,
+    "primaryDuration": 185,
+    "secondaryDuration": 180,
+    "contentShift": 3,
+    "curve": [
+      0.2,
+      0.8,
+      0.2,
+      1
+    ],
+    "alertGap": 300,
+    "hoverResume": 100
+  },
+  "control": {
+    "icon": 15,
+    "size": 28,
+    "compactHeight": 36
+  },
+  "shadow": {
+    "surface": "none"
+  },
+  "typography": {
+    "family": "Pretendard",
+    "hero": 30,
+    "primary": 14,
+    "secondary": 12,
+    "caption": 11,
+    "compactScore": 18,
+    "accent": 13
+  },
+  "geometry": {
+    "archCompact": 200,
+    "archExpanded": 344,
+    "archContext": 464,
+    "matciExpanded": 368,
+    "neckWidth": 104,
+    "earMin": 6,
+    "earMax": 14,
+    "seedHeight": 6,
+    "expandedWide": 464,
+    "kakaoAlertHeight": 96,
+    "kakaoAlertHeightShort": 80,
+    "spotifyExpandedHeight": 168,
+    "spotifyCompact": 56
+  },
+  "material": {
+    "keyLineAlpha": 0.08,
+    "lift": 0
+  }
+}

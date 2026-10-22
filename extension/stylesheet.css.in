@@ -1,0 +1,47 @@
+/* notci: shared island content classes. The slab itself is drawn by notchSurface.js. */
+.notci-module { font-family: '{{typography.family}}'; color: {{color.labelPrimary}}; background-color: transparent; }
+.notci-module StLabel, .notci-module StButton { font-family: '{{typography.family}}'; }
+
+/* Compact modules share one row; each keeps its own side padding. */
+.notci-compact { padding: 4px {{spacing.md}}px; spacing: {{spacing.sm}}px; }
+.notci-compact-module { min-height: 28px; padding: 0 6px; border-radius: 14px; background-color: transparent; }
+.notci-compact-module:hover { background-color: {{color.hoverWash}}; }
+.notci-compact-module:active { background-color: {{color.pressedWash}}; }
+.notci-compact-module:focus { background-color: {{color.hoverWash}}; box-shadow: inset 0 0 0 2px {{color.focus}}; }
+
+/* Expanded card: 12/16/14 insets, concentric with the 22 px slab corner. */
+.notci-card { padding: 12px 16px 14px; spacing: {{spacing.sm}}px; }
+.notci-card-row { spacing: {{spacing.md}}px; }
+.notci-card-column { spacing: 2px; }
+.notci-title { color: {{color.labelPrimary}}; font-size: {{typography.primary}}px; font-weight: 600; }
+.notci-body { color: {{color.labelSecondary}}; font-size: {{typography.secondary}}px; font-weight: 500; }
+.notci-body-2 { color: rgba(255, 255, 255, 0.7); font-size: {{typography.secondary}}px; font-weight: 500; }
+.notci-caption { color: {{color.labelSecondary}}; font-size: {{typography.caption}}px; font-weight: 500; }
+.notci-accent-text { color: {{color.labelSecondary}}; font-size: {{typography.accent}}px; font-weight: 500; }
+.notci-tnum { font-feature-settings: "tnum"; }
+.notci-icon-button { width: {{control.size}}px; height: {{control.size}}px; color: {{color.labelSecondary}}; border-radius: 8px; background-color: transparent; }
+.notci-icon-button:hover { background-color: {{color.hoverWash}}; }
+.notci-icon-button:active { background-color: {{color.pressedWash}}; }
+.notci-icon-button:focus { background-color: {{color.hoverWash}}; box-shadow: inset 0 0 0 2px {{color.focus}}; }
+.notci-control { width: 36px; height: 36px; border-radius: 18px; color: {{color.labelPrimary}}; background-color: transparent; }
+.notci-control:hover { background-color: {{color.hoverWash}}; }
+.notci-control:active { background-color: {{color.pressedWash}}; }
+.notci-control:focus { background-color: {{color.hoverWash}}; box-shadow: inset 0 0 0 2px {{color.focus}}; }
+.notci-control:insensitive { color: {{color.labelTertiary}}; }
+
+/* Spotify: art + fake waveform compact, art/title/artist/progress/controls expanded. Album accent via set_style. */
+.notci-spotify-compact { spacing: 6px; }
+.notci-art-compact { width: 20px; height: 20px; border-radius: 4px; background-color: {{color.surfaceTrack}}; background-size: cover; }
+.notci-art { width: 64px; height: 64px; border-radius: 12px; background-color: {{color.surfaceTrack}}; background-size: cover; }
+.notci-bars { spacing: 1px; height: 12px; }
+.notci-bar { width: 3px; height: 12px; border-radius: 1.5px; background-color: {{color.brandSpotify}}; }
+.notci-spotify-play { width: 28px; height: 28px; border-radius: 14px; background-color: {{color.labelPrimary}}; color: {{color.surfacePrimary}}; }
+.notci-progress-track { height: 4px; border-radius: 2px; background-color: {{color.surfaceTrack}}; }
+.notci-progress-fill { height: 4px; border-radius: 2px; background-color: {{color.brandSpotify}}; }
+.notci-controls { spacing: 8px; }
+
+/* KakaoTalk: avatar + sender + two-line body; the brand yellow only on the badge. */
+.notci-kakao-sender { color: {{color.labelPrimary}}; font-size: {{typography.primary}}px; font-weight: 700; }
+.notci-avatar { width: 44px; height: 44px; border-radius: 22px; background-color: {{color.surfaceTrack}}; }
+.notci-avatar-badge { width: 16px; height: 16px; border-radius: 8px; background-color: {{color.brandKakao}}; color: {{color.surfacePrimary}}; }
+.notci-kakao-badge { color: {{color.surfacePrimary}}; background-color: {{color.brandKakao}}; font-size: {{typography.caption}}px; font-weight: 700; padding: 1px 6px; border-radius: 999px; }
