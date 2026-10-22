@@ -9,8 +9,8 @@
 .notci-compact-module:active { background-color: rgba(255, 255, 255, 0.14); }
 .notci-compact-module:focus { background-color: rgba(255, 255, 255, 0.08); box-shadow: inset 0 0 0 2px #0a84ff; }
 
-/* Expanded card: 12/16/14 insets, concentric with the 22 px slab corner. */
-.notci-card { padding: 12px 16px 14px; spacing: 8px; }
+/* Expanded card: 10/16/10 insets, concentric with the 22 px slab corner. */
+.notci-card { padding: 10px 16px 10px; spacing: 6px; }
 .notci-card-row { spacing: 12px; }
 .notci-card-column { spacing: 2px; }
 .notci-title { color: #ffffff; font-size: 10.5pt; font-weight: 600; }
@@ -23,7 +23,7 @@
 .notci-icon-button:hover { background-color: rgba(255, 255, 255, 0.08); }
 .notci-icon-button:active { background-color: rgba(255, 255, 255, 0.14); }
 .notci-icon-button:focus { background-color: rgba(255, 255, 255, 0.08); box-shadow: inset 0 0 0 2px #0a84ff; }
-.notci-control { width: 36px; height: 36px; border-radius: 18px; color: #ffffff; background-color: transparent; }
+.notci-control { width: 32px; height: 32px; border-radius: 16px; color: #ffffff; background-color: transparent; }
 .notci-control:hover { background-color: rgba(255, 255, 255, 0.08); }
 .notci-control:active { background-color: rgba(255, 255, 255, 0.14); }
 .notci-control:focus { background-color: rgba(255, 255, 255, 0.08); box-shadow: inset 0 0 0 2px #0a84ff; }

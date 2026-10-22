@@ -36,6 +36,7 @@ const ICON_PLAY = 16;
 const ICON_FALLBACK = 16;
 const ART_SIZE = 8;
 const SEEK_DEBOUNCE_MS = 300;
+const IDLE_MS = 8000;
 const POSITION_REREAD_TICKS = 5;
 const ACCENT_CACHE_MAX = 32;
 const TIMERS = ['_tick', '_peekTimer', '_seekTimer', '_closingTimer'];
@@ -83,14 +84,21 @@ export class SpotifyModule {
             () => this._onAppeared(), () => this._onVanished());
     }
 
-    // Public: manual expand (no auto-collapse), track-change peek, collapse.
+    // Public: manual expand (idle-collapses after IDLE_MS, like a long-pressed Live Activity),
+    // track-change peek, collapse. The compact pill toggles.
     expand() {
         if (!this._visible() || !this._dock?.claim(100)) return;
         this._clearPeek();
-        if (this._expanded) return;
-        this._expanded = true;
-        this._render();
-        this._readPosition();
+        if (!this._expanded) {
+            this._expanded = true;
+            this._render();
+            this._readPosition();
+        }
+        this._armPeek(IDLE_MS);
+    }
+
+    toggle() {
+        if (this._expanded) this.collapse(); else this.expand();
     }
 
     peek() {
@@ -418,7 +426,7 @@ export class SpotifyModule {
             const width = expanded ? DESIGN.geometry.expandedWide : DESIGN.geometry.spotifyCompact;
             const [, natural] = child.get_preferred_height(width);
             if (expanded) {
-                this._expandedHeight = Math.max(DESIGN.geometry.spotifyExpandedHeight, Math.ceil(natural));
+                this._expandedHeight = Math.ceil(natural);
                 this._ui.trackWidth = width - this._ui.card.get_theme_node().get_horizontal_padding();
                 this._redrawProgress();
             } else {
@@ -454,7 +462,7 @@ export class SpotifyModule {
         row.add_child(this._artBox('notci-art-compact'));
         row.add_child(this._bars());
         button.set_child(row);
-        button.connect('clicked', () => this.expand());
+        button.connect('clicked', () => this.toggle());
         this.root.add_child(button);
         this._ui.button = button;
         return button;
@@ -464,6 +472,15 @@ export class SpotifyModule {
         const card = new St.BoxLayout({vertical: true, style_class: 'notci-card', reactive: true, track_hover: true,
             x_expand: true});
         card.connect('notify::hover', () => this._onCardHover(card.hover));
+        // The card itself is the island: a click on its empty area folds it back, buttons act first.
+        card.connect('button-release-event', (_actor, event) => {
+            const source = event.get_source();
+            if (source !== card && source !== header && source !== column && source !== this._ui.body &&
+                source !== this._ui.title && source !== this._ui.artist && source !== this._ui.album)
+                return Clutter.EVENT_PROPAGATE;
+            this.collapse();
+            return Clutter.EVENT_STOP;
+        });
         const header = new St.BoxLayout({style_class: 'notci-card-row', x_expand: true});
         const art = this._artBox('notci-art', true);
         art.connect('clicked', () => APP_IDS.map(id => Shell.AppSystem.get_default().lookup_app(id)).find(Boolean)?.activate());

@@ -27,7 +27,7 @@ participant.destroy()
 
 ## 표면과 모션
 
-- `#000` 불투명, lift 0, 1px 흰 8% 키라인(귀·옆·아래). 오목 귀 6→14, 아래 반경 22(36px compact에서는 16). 그림자 없음.
+- `#000` 불투명, lift 0, 1px 흰 8% 키라인(귀·옆·아래). notci가 켜져 있는 동안 상단 패널도 `Main.panel` 인라인 스타일로 `#000`(disable 시 복원, 잠금 화면은 user 세션 모드라 영향 없음). 오목 귀 6→14, 아래 반경 22(36px compact에서는 16). 그림자 없음.
 - slab morph 240/185ms `cubic-bezier(.2,.8,.2,1)`, 세로 seed 104×6에서 자람. 모듈이 들어오고 나갈 때 코어가 content를 100ms 크로스페이드. 접힐 때만 콘텐츠 크기 맞춤을 100ms 미룬다. `enable-animations=false`면 즉시.
 - 바깥 좌·우클릭은 소유자의 `onOutside`(캡처 단계, 이벤트는 전달).
 
@@ -37,10 +37,12 @@ participant.destroy()
 |---|---|---|
 | Archsport | 200×36 | 344(라이브) / 464(일정·문맥) × 측정 140–480 |
 | matci | 없음(패널만) | 368 × 측정 |
-| notci/spotify | 56×36 (아트 20 + 4바) | 464×168 |
-| notci/kakao | 없음 | 464×96 (1줄 80) |
+| notci/spotify | 56×36 (아트 20 + 4바) | 464 × 측정(≈144; 카드 인셋 10/16/10, 컨트롤 32) |
+| notci/kakao | 없음 | 464 × 측정(2줄 ≈92, 1줄 ≈76) |
 
-알림 시간: 골 6s(`event-seconds`), 카카오톡 5s(`kakao-seconds`), Spotify peek 3s(`spotify-peek-seconds`); hover 중 정지, 이탈 100ms 후 재개; 다음 알림은 300ms 뒤.
+알림 시간: 골 6s(`event-seconds`), 카카오톡 5s(`kakao-seconds`), Spotify peek 3s(`spotify-peek-seconds`), Spotify 수동 펼침은 8s 유휴 후 접힘; hover 중 정지, 이탈 100ms 후 재개; 다음 알림은 300ms 뒤.
+
+닫는 방법(모든 카드 공통): 섬 바깥 좌·우클릭, Esc(포커스가 섬 안일 때). Spotify는 compact 알약 클릭이 토글이고 카드의 빈 곳(제목·아티스트·여백)을 클릭해도 접힌다. 카카오톡 카드는 클릭하면 카카오톡 창을 앞으로 가져오고 접힌다.
 
 ## 검증
 
