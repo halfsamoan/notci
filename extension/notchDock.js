@@ -30,7 +30,7 @@ function layoutSourceHash() {
         hideSlab, showSlab, slabFor, destroySlabs, attach, detach, placeContent, monitorKey, keepOnStage,
         dismissOnFocusChange, insideActiveSurface, getDock, DockParticipant]
         .map(fn => typeof fn === 'string' ? fn : fn.toString()).join('|');
-    for (const char of `${contract}|capture-dismiss-v6|island-v1`) {
+    for (const char of `${contract}|capture-dismiss-v7|island-v1`) {
         hash ^= char.charCodeAt(0);
         hash = Math.imul(hash, 16777619);
     }
@@ -318,8 +318,9 @@ function placeContent(dock, slab, participant, slot, island) {
 
 function insideActiveSurface(dock, participant, event) {
     const {x, y} = eventCoordinates(event);
+    // GNOME 50: event.get_source() is always null; ask the stage for the actor under the event.
     let source = null;
-    try { source = event.get_source(); } catch (_error) {}
+    try { source = global.stage.get_event_actor(event); } catch (_error) {}
     // Preserve only the active module's own opener; another app's panel button is outside.
     let trigger = null;
     try { trigger = participant.triggerActor?.(); } catch (_error) {}
@@ -405,10 +406,14 @@ function getDock() {
         const inside = owner ? insideActiveSurface(dock, owner, event) : null;
         if (owner) {
             try {
-                dispatchOutsideDismiss({eventType: event.type(),
+                const dismissed = dispatchOutsideDismiss({eventType: event.type(),
                     buttonPressType: Clutter.EventType.BUTTON_PRESS, active: Boolean(dock.active),
                     button: buttonNumber(event.get_button()), expanded: owner.state.visible && owner.state.expanded},
                 () => owner.onOutside?.(), inside ?? {});
+                // One line per press while a card is open: enough to read a real-session failure from the journal.
+                const {x, y} = eventCoordinates(event);
+                console.log(`[notchDock] press ${Math.round(x)},${Math.round(y)} button=${buttonNumber(event.get_button())} owner=${owner.id} ` +
+                    `expanded=${owner.state.visible && owner.state.expanded} inside=${JSON.stringify(inside)} dismissed=${dismissed}`);
             } catch (error) {
                 console.warn(`[notchDock] outside dismissal failed: ${error.message}`);
             }

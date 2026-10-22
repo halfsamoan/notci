@@ -474,7 +474,9 @@ export class SpotifyModule {
         card.connect('notify::hover', () => this._onCardHover(card.hover));
         // The card itself is the island: a click on its empty area folds it back, buttons act first.
         card.connect('button-release-event', (_actor, event) => {
-            const source = event.get_source();
+            // GNOME 50: event.get_source() is always null; the stage knows the actor under the event.
+            let source = null;
+            try { source = global.stage.get_event_actor(event); } catch (_error) {}
             if (source !== card && source !== header && source !== column && source !== this._ui.body &&
                 source !== this._ui.title && source !== this._ui.artist && source !== this._ui.album)
                 return Clutter.EVENT_PROPAGATE;
