@@ -175,9 +175,9 @@ export class SpotifyModule {
             if (this._shellEnding || !this.root) return;
             this._proxy = proxy;
             this._running = true;
-            proxy.connectObject('g-properties-changed', (_proxy, changed) => this._onProperties(changed.recursive_unpack()), this);
+            proxy.connectObject('g-properties-changed', (_proxy, changed) => this._onProperties(changed.recursiveUnpack()), this);
             this._seekedId = proxy.connectSignal('Seeked', () => this._onSeeked());
-            const cached = name => proxy.get_cached_property(name)?.recursive_unpack();
+            const cached = name => proxy.get_cached_property(name)?.recursiveUnpack();
             this._onProperties({PlaybackStatus: cached('PlaybackStatus') ?? 'Stopped', Metadata: cached('Metadata') ?? {},
                 CanGoNext: Boolean(cached('CanGoNext')), CanGoPrevious: Boolean(cached('CanGoPrevious'))}, true);
         }, this._cancellable, Gio.DBusProxyFlags.NONE);
@@ -238,7 +238,7 @@ export class SpotifyModule {
             const result = await Gio.DBus.session.call(BUS, PATH, 'org.freedesktop.DBus.Properties', 'Get',
                 new GLib.Variant('(ss)', [IFACE, 'Position']), new GLib.VariantType('(v)'),
                 Gio.DBusCallFlags.NONE, 1000, this._cancellable);
-            const [positionUs] = result.recursive_unpack();
+            const [positionUs] = result.recursiveUnpack();
             this._position = {positionUs: Number(positionUs) || 0, atUs: GLib.get_monotonic_time()};
             this._redrawProgress();
         } catch (error) {
