@@ -32,5 +32,34 @@
       <default>true</default>
       <summary>앨범 색을 파형·아티스트·진행 막대에 사용</summary>
     </key>
+    <key name="audio-enabled" type="b">
+      <default>true</default>
+      <summary>오디오 기기 연결 상태를 노치에 표시</summary>
+    </key>
+    <key name="audio-toast-seconds" type="i">
+      <range min="1" max="10"/>
+      <default>4</default>
+      <summary>기기 연결/해제 카드 표시 시간(초)</summary>
+    </key>
+    <key name="audio-usb" type="b">
+      <default>true</default>
+      <summary>USB 마우스·키보드 연결/해제도 카드로 알림 (알약은 없음)</summary>
+    </key>
+    <key name="audio-easyeffects" type="b">
+      <default>true</default>
+      <summary>카드에 EasyEffects(Flatpak) 출력 프리셋 표시</summary>
+    </key>
+    <key name="audio-easyeffects-autostart" type="b">
+      <default>true</default>
+      <summary>EasyEffects가 꺼져 있으면 창 없이 서비스로 띄운 뒤 프리셋 적용</summary>
+    </key>
+    <key name="agent-enabled" type="b">
+      <default>true</default>
+      <summary>Claude·ChatGPT 답변이 끝나면 작은 섬에 캐릭터 표시</summary>
+    </key>
+    <key name="download-enabled" type="b">
+      <default>true</default>
+      <summary>0.7 GB 이상 다운로드 진행률을 작은 섬에 표시</summary>
+    </key>
   </schema>
 </schemalist>

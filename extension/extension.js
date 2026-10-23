@@ -6,6 +6,9 @@ import {isActorWithin} from './dockModel.js';
 import {DESIGN} from './designTokens.js';
 import {KakaoModule} from './modules/kakao.js';
 import {SpotifyModule} from './modules/spotify.js';
+import {AudioModule} from './modules/audio.js';
+import {AgentModule} from './modules/agent.js';
+import {DownloadModule} from './modules/download.js';
 
 // One private cache directory for album art and probe files.
 export const CACHE_DIR = GLib.build_filenamev([GLib.get_user_cache_dir(), 'notci@local']);
@@ -22,11 +25,14 @@ export default class Notci extends Extension {
         const context = {settings: this._settings, uuid: this.uuid, path: this.path, cacheDir: CACHE_DIR};
         this._spotify = new SpotifyModule(context);
         this._kakao = new KakaoModule(context);
+        this._audio = new AudioModule(context);
+        this._agent = new AgentModule(context);
+        this._download = new DownloadModule(context);
         // Esc collapses whichever module holds key focus; alert cards never steal focus.
         this._keyId = global.stage.connect('key-press-event', (_stage, event) => {
             if (event.get_key_symbol() !== Clutter.KEY_Escape) return Clutter.EVENT_PROPAGATE;
             const focus = global.stage.get_key_focus();
-            for (const module of [this._kakao, this._spotify]) {
+            for (const module of [this._kakao, this._spotify, this._audio]) {
                 if (!module?.root || !isActorWithin(focus, module.root)) continue;
                 module.collapse();
                 return Clutter.EVENT_STOP;
@@ -40,9 +46,13 @@ export default class Notci extends Extension {
             try { global.stage.disconnect(this._keyId); } catch (_error) {}
         }
         this._keyId = 0;
+        this._download?.destroy();
+        this._agent?.destroy();
+        // audio first: it owns subprocesses and udev/UPower listeners.
+        this._audio?.destroy();
         this._kakao?.destroy();
         this._spotify?.destroy();
         try { Main.panel.set_style(this._panelStyle ?? null); } catch (_error) {}
-        this._kakao = this._spotify = this._settings = null;
+        this._kakao = this._spotify = this._audio = this._agent = this._download = this._settings = null;
     }
 }

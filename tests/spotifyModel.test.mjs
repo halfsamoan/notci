@@ -3,7 +3,8 @@ import assert from 'node:assert/strict';
 import {metadataToState, positionAt, artVariantUrl, accentFromPixels, formatTime} from '../extension/modules/spotifyModel.js';
 
 const FALLBACK = '#1db954';
-const ART = 'https://i.scdn.co/image/ab67616d0000b2730123456789abcdef0123456789abcdef';
+// Real shape: prefix + 24 hex (live MPRIS artUrl, 2026-10-23).
+const ART = 'https://i.scdn.co/image/ab67616d0000b2738c4ad3af2e4d5ead81934709';
 
 test('metadataToState normalises MPRIS keys and defaults missing or wrongly typed values', () => {
     assert.deepEqual(metadataToState({'mpris:trackid': '/com/spotify/track/abc', 'xesam:title': 'Song',
@@ -24,12 +25,12 @@ test('positionAt extrapolates while playing, holds while paused and clamps to th
     assert.equal(positionAt({positionUs: 5, atUs: 10, playing: true}, 3), 5);
 });
 
-test('artVariantUrl picks the 64 or 300 px CDN variant and leaves other urls alone', () => {
-    const id = '0123456789abcdef0123456789abcdef';
-    assert.equal(artVariantUrl(ART, 1), `https://i.scdn.co/image/ab67616d00004851${id}`);
+test('artVariantUrl always picks the 300 px CDN variant and leaves other urls alone', () => {
+    const id = '8c4ad3af2e4d5ead81934709';
+    assert.equal(artVariantUrl(ART, 1), `https://i.scdn.co/image/ab67616d00001e02${id}`);
     assert.equal(artVariantUrl(ART, 2), `https://i.scdn.co/image/ab67616d00001e02${id}`);
     assert.equal(artVariantUrl(`https://open.spotify.com/image/ab67616d0000b273${id}`, 1),
-        `https://i.scdn.co/image/ab67616d00004851${id}`);
+        `https://i.scdn.co/image/ab67616d00001e02${id}`);
     assert.equal(artVariantUrl('https://example.com/cover.jpg', 2), 'https://example.com/cover.jpg');
     assert.equal(artVariantUrl('https://i.scdn.co/image/ab67616d0000b273short', 1), 'https://i.scdn.co/image/ab67616d0000b273short');
     assert.equal(artVariantUrl(undefined, 1), '');

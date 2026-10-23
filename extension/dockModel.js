@@ -22,6 +22,39 @@ export function canClaim(active, id, priority) {
     return !active || active.id === id || priority >= active.priority;
 }
 
+// Only a manually opened card holds a stage grab (outside click and Esc close it, the click is not
+// replayed to the app). Toasts never grab: they must not steal a click or a keystroke from the app.
+export const GRAB_PRIORITY = 100;
+export function needsGrab(active, state, threshold = GRAB_PRIORITY) {
+    return Boolean(active && state?.visible && state?.expanded && active.priority >= threshold);
+}
+
+// Slab morphs ride a damped spring (SwiftUI response/dampingFraction), not the old fixed curve:
+// growing overshoots ~2% and settles, shrinking is critically damped. Apple does not publish the
+// island's values. GJS cannot drive a Clutter progress function on Mutter 50 (the callback runs but
+// its return value is ignored; harness 2026-10-24), so each spring ships as the cubic-bezier that
+// tracks it within 2.5% over springDuration(), overshoot capped at 2.5% (fitted offline, checked in tests/dock.test.mjs).
+export const SPRING_OPEN = {response: 0.45, damping: 0.78, curve: [0.3, 0.35, 0.1, 1.16]};
+export const SPRING_CLOSE = {response: 0.32, damping: 1, curve: [0.25, 0.3, 0.15, 0.98]};
+export const CONTENT_GROW_FROM = 0.96;
+
+export function springAt(t, {response, damping}) {
+    const omega = 2 * Math.PI / response;
+    if (damping >= 1) return 1 - Math.exp(-omega * t) * (1 + omega * t);
+    const damped = omega * Math.sqrt(1 - damping * damping);
+    return 1 - Math.exp(-damping * omega * t) * (Math.cos(damped * t) + damping * omega / damped * Math.sin(damped * t));
+}
+
+// Milliseconds until the spring stays within `epsilon` of the target (scanned at 240 Hz).
+export function springDuration(spring, epsilon = 0.005) {
+    let last = 0;
+    for (let ms = 0; ms <= 2000; ms += 1000 / 240) {
+        if (Math.abs(1 - springAt(ms / 1000, spring)) > epsilon) last = ms;
+    }
+    return Math.ceil(last);
+}
+
+
 export function isActorWithin(source, ancestor) {
     if (!source || !ancestor) return false;
     try {

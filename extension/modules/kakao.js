@@ -62,6 +62,7 @@ export class KakaoModule {
         this._dismissTimer = this._hoverTimer = this._retryTimer = this._gapTimer = 0;
         this._card = this._body = null;
         this._hiddenPopups = new Set();
+        this._popupWindows = new Map();   // popup Meta.Window -> {actor, event} once mirrored, else null
         this._interface = new Gio.Settings({schema_id: 'org.gnome.desktop.interface'});
         this.root = new St.BoxLayout({vertical: true, style_class: 'notci-module notci-kakao',
             reactive: false, can_focus: false, clip_to_allocation: true, accessible_name: '카카오톡 알림'});
@@ -90,6 +91,11 @@ export class KakaoModule {
         }
         this._queue = [];
         this.collapse();
+        // Popups hidden for the mirror must come back when KakaoTalk is turned off.
+        for (const actor of this._hiddenPopups) {
+            try { actor.opacity = 255; } catch (_error) {}
+        }
+        this._hiddenPopups.clear();
     }
 
     _showBody() {
@@ -336,33 +342,54 @@ export class KakaoModule {
     // ---- K2: KakaoTalk's own popup mirrored into the island. Inactive while POPUP_FINGERPRINT is null;
     // delete this block once the text bridge makes it redundant. ----
     _onWindowCreated(window) {
-        if (!POPUP_FINGERPRINT || !this._showBody() || this._settings.get_string('kakao-source') === 'phone') return;
+        if (!this._mirrorAllowed()) return;
         if (window.get_wm_class() !== 'kakaotalk.exe' || window.get_window_type() !== Meta.WindowType.NORMAL ||
             window.get_title() !== '' || !window.is_above() || !window.is_skip_taskbar()) return;
-        // The popup slides in; measure after it has settled, not at the first map.
+        if (this._popupWindows.has(window)) return;
+        this._popupWindows.set(window, null);
+        // The popup slides in; measure after it has settled, not at the first map. Both handlers are
+        // connected once per window and dropped in _forgetPopup: Meta.Window signals are not released
+        // on their own, so every popup used to stay referenced (and a re-shown one stacked handlers).
         window.connectObject('shown', () => GLib.timeout_add(GLib.PRIORITY_DEFAULT, POPUP_SETTLE_MS, () => {
-            if (!this._dock || !window.get_compositor_private()) return GLib.SOURCE_REMOVE;
+            // Settings are checked again: the window may be re-shown after KakaoTalk or the body was turned off.
+            if (!this._dock || !this._mirrorAllowed() || !this._popupWindows.has(window) || !window.get_compositor_private())
+                return GLib.SOURCE_REMOVE;
             const {width, height} = window.get_frame_rect();
             const f = POPUP_FINGERPRINT;
             const actor = window.get_compositor_private();
             if (!actor || width < f.minWidth || width > f.maxWidth || height < f.minHeight || height > f.maxHeight)
                 return GLib.SOURCE_REMOVE;
+            if (this._active?.popupActor === actor) return GLib.SOURCE_REMOVE;   // re-shown while mirrored
             actor.opacity = 0;
             this._hiddenPopups.add(actor);
             const event = messageEvent({source: 'pc'});
             event.popupActor = actor;
-            // The dismiss timer (kakao-seconds, at most 15 s) caps the mirror; the popup closing ends it early.
-            window.connectObject('unmanaged', () => {
-                this._hiddenPopups.delete(actor);
-                this._queue = this._queue.filter(item => item !== event);
-                if (this._active === event) this.collapse();
-                // The clone must go before its source actor does.
-                this.root?.destroy_all_children();
-            }, this);
+            this._queue = this._queue.filter(item => item.popupActor !== actor);
+            this._popupWindows.set(window, {actor, event});
             this._queue.push(event);
             this._showNext();
             return GLib.SOURCE_REMOVE;
-        }), this);
+        }),
+        // The dismiss timer (kakao-seconds, at most 15 s) caps the mirror; the popup closing ends it early.
+        'unmanaged', () => this._forgetPopup(window), this);
+    }
+
+    _forgetPopup(window) {
+        const mirrored = this._popupWindows.get(window);
+        this._popupWindows.delete(window);
+        try { window.disconnectObject(this); } catch (_error) {}
+        if (!mirrored) return;
+        this._hiddenPopups.delete(mirrored.actor);
+        // Matched by actor: a re-shown window gets a new event, and another card may be active by now.
+        this._queue = this._queue.filter(item => item.popupActor !== mirrored.actor);
+        if (this._active?.popupActor === mirrored.actor) this.collapse();
+        // The clone must go before its source actor does; a different active card holds no clone of it.
+        if (!this._active) this.root?.destroy_all_children();
+    }
+
+    _mirrorAllowed() {
+        return Boolean(POPUP_FINGERPRINT) && this._settings.get_boolean('kakao-enabled') && this._showBody() &&
+            this._settings.get_string('kakao-source') !== 'phone';
     }
 
     destroy() {
@@ -375,6 +402,10 @@ export class KakaoModule {
             try { actor.opacity = 255; } catch (_error) {}
         }
         this._hiddenPopups.clear();
+        for (const window of this._popupWindows.keys()) {
+            try { window.disconnectObject(this); } catch (_error) {}
+        }
+        this._popupWindows.clear();
         this._queue = [];
         this._active = null;
         this._dock?.destroy();

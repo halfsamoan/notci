@@ -46,3 +46,37 @@
 .notci-avatar-badge { width: 16px; height: 16px; border-radius: 8px; background-color: {{color.brandKakao}}; color: {{color.surfacePrimary}}; }
 .notci-kakao-badge { color: {{color.surfacePrimary}}; background-color: {{color.brandKakao}}; font-size: {{typography.caption}}px; font-weight: 700; padding: 1px 6px; border-radius: 999px; }
 .notci-kakao .notci-card:focus { border-radius: 16px; box-shadow: inset 0 0 0 2px {{color.focus}}; }
+
+/* Audio: device icon + battery compact; device header, output chips and EasyEffects preset chips expanded.
+   New classes only — the shared card/compact/control classes above are not touched. */
+.notci-audio-compact { spacing: 6px; }
+.notci-device-art { width: 64px; height: 64px; border-radius: 12px; background-color: {{color.surfaceTrack}}; color: {{color.labelPrimary}}; }
+.notci-audio-body { spacing: 4px; }
+.notci-chip-rows { spacing: 6px; padding: 2px 0; }
+.notci-chip-row { spacing: 6px; }
+.notci-chip { height: 28px; border-radius: 14px; padding: 0 10px; color: {{color.labelPrimary}}; background-color: {{color.surfaceTrack}}; }
+.notci-chip:hover { background-color: {{color.surfaceHover}}; }
+.notci-chip:active { background-color: {{color.surfacePressed}}; }
+.notci-chip:focus { box-shadow: inset 0 0 0 2px {{color.focus}}; }
+.notci-chip:insensitive { color: {{color.labelTertiary}}; }
+.notci-chip-active, .notci-chip-active:hover, .notci-chip-active:active { background-color: {{color.labelPrimary}}; color: {{color.surfacePrimary}}; }
+.notci-chip-inner { spacing: 6px; }
+.notci-chip-label { font-size: {{typography.caption}}px; font-weight: 600; max-width: 180px; }
+.notci-battery-ok { color: {{color.accentPositive}}; }
+.notci-battery-low { color: {{color.accentWarning}}; }
+.notci-battery-critical { color: {{color.accentCritical}}; }
+/* Audio v7: battery ring (new classes only).
+   The ring draws in its foreground colour: inherited white, or a .notci-battery-* tone. */
+.notci-ring-compact { width: 18px; height: 18px; -notci-ring-width: 3px; }
+.notci-ring-card { width: 40px; height: 40px; -notci-ring-width: 4px; }
+.notci-ring-text { color: {{color.labelPrimary}}; }
+/* Agent pet (v10): pixel character drawn by Cairo; the label is the app that finished. New classes only. */
+.notci-agent-compact { spacing: 6px; }
+.notci-agent-pet { width: 24px; height: 28px; }
+.notci-agent-label { color: {{color.labelPrimary}}; font-size: {{typography.secondary}}px; font-weight: 600; }
+/* Download pill (v10): icon + ring (shared ring.js) + percent or GB so far. */
+.notci-download-compact { spacing: 6px; }
+.notci-download-ring { color: {{color.actionPrimary}}; }
+.notci-download-label { color: {{color.labelPrimary}}; font-size: {{typography.secondary}}px; font-weight: 600; }
+.notci-download-stalled { color: {{color.accentWarning}}; }
+.notci-download-done { color: {{color.accentPositive}}; }

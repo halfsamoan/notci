@@ -46,3 +46,37 @@
 .notci-avatar-badge { width: 16px; height: 16px; border-radius: 8px; background-color: #fee500; color: #000000; }
 .notci-kakao-badge { color: #000000; background-color: #fee500; font-size: 8.25pt; font-weight: 700; padding: 1px 6px; border-radius: 999px; }
 .notci-kakao .notci-card:focus { border-radius: 16px; box-shadow: inset 0 0 0 2px #0a84ff; }
+
+/* Audio: device icon + battery compact; device header, output chips and EasyEffects preset chips expanded.
+   New classes only — the shared card/compact/control classes above are not touched. */
+.notci-audio-compact { spacing: 6px; }
+.notci-device-art { width: 64px; height: 64px; border-radius: 12px; background-color: rgba(255, 255, 255, 0.12); color: #ffffff; }
+.notci-audio-body { spacing: 4px; }
+.notci-chip-rows { spacing: 6px; padding: 2px 0; }
+.notci-chip-row { spacing: 6px; }
+.notci-chip { height: 28px; border-radius: 14px; padding: 0 10px; color: #ffffff; background-color: rgba(255, 255, 255, 0.12); }
+.notci-chip:hover { background-color: rgba(255, 255, 255, 0.18); }
+.notci-chip:active { background-color: rgba(255, 255, 255, 0.24); }
+.notci-chip:focus { box-shadow: inset 0 0 0 2px #0a84ff; }
+.notci-chip:insensitive { color: #8e8e93; }
+.notci-chip-active, .notci-chip-active:hover, .notci-chip-active:active { background-color: #ffffff; color: #000000; }
+.notci-chip-inner { spacing: 6px; }
+.notci-chip-label { font-size: 8.25pt; font-weight: 600; max-width: 180px; }
+.notci-battery-ok { color: #30d158; }
+.notci-battery-low { color: #ff9f0a; }
+.notci-battery-critical { color: #ff453a; }
+/* Audio v7: battery ring (new classes only).
+   The ring draws in its foreground colour: inherited white, or a .notci-battery-* tone. */
+.notci-ring-compact { width: 18px; height: 18px; -notci-ring-width: 3px; }
+.notci-ring-card { width: 40px; height: 40px; -notci-ring-width: 4px; }
+.notci-ring-text { color: #ffffff; }
+/* Agent pet (v10): pixel character drawn by Cairo; the label is the app that finished. New classes only. */
+.notci-agent-compact { spacing: 6px; }
+.notci-agent-pet { width: 24px; height: 28px; }
+.notci-agent-label { color: #ffffff; font-size: 9pt; font-weight: 600; }
+/* Download pill (v10): icon + ring (shared ring.js) + percent or GB so far. */
+.notci-download-compact { spacing: 6px; }
+.notci-download-ring { color: #0a84ff; }
+.notci-download-label { color: #ffffff; font-size: 9pt; font-weight: 600; }
+.notci-download-stalled { color: #ff9f0a; }
+.notci-download-done { color: #30d158; }

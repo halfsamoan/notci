@@ -40,5 +40,34 @@ export default class NotciPreferences extends ExtensionPreferences {
         const accent = new Adw.SwitchRow({title: '앨범 색 사용', subtitle: '파형·아티스트·진행 막대에만 쓰이고 배경은 늘 검정입니다.'});
         settings.bind('spotify-accent', accent, 'active', Gio.SettingsBindFlags.DEFAULT);
         spotify.add(accent);
+
+        const audio = new Adw.PreferencesGroup({title: '오디오·주변기기',
+            description: '헤드셋이나 USB 기기가 연결되면 잠시 펼쳐지고, 오디오 기기는 연결 중 작은 알약으로 남습니다. 카드에서 출력 장치와 EasyEffects 프리셋을 바꿉니다.'});
+        page.add(audio);
+        const audioEnabled = new Adw.SwitchRow({title: '기기 연결 표시'});
+        settings.bind('audio-enabled', audioEnabled, 'active', Gio.SettingsBindFlags.DEFAULT);
+        audio.add(audioEnabled);
+        const toast = new Adw.SpinRow({title: '연결 카드 표시 시간(초)', adjustment: new Gtk.Adjustment({lower: 1, upper: 10, step_increment: 1})});
+        settings.bind('audio-toast-seconds', toast, 'value', Gio.SettingsBindFlags.DEFAULT);
+        audio.add(toast);
+        const usb = new Adw.SwitchRow({title: 'USB 마우스·키보드 알림', subtitle: '꽂거나 뽑을 때만 카드가 뜨고 알약은 생기지 않습니다.'});
+        settings.bind('audio-usb', usb, 'active', Gio.SettingsBindFlags.DEFAULT);
+        audio.add(usb);
+        const easyeffects = new Adw.SwitchRow({title: 'EasyEffects 프리셋 표시', subtitle: 'Flatpak 설치본(com.github.wwmm.easyeffects)의 출력 프리셋입니다.'});
+        settings.bind('audio-easyeffects', easyeffects, 'active', Gio.SettingsBindFlags.DEFAULT);
+        audio.add(easyeffects);
+        const autostart = new Adw.SwitchRow({title: 'EasyEffects 자동 실행', subtitle: '꺼져 있으면 창 없이 서비스로 띄운 뒤 프리셋을 적용합니다.'});
+        settings.bind('audio-easyeffects-autostart', autostart, 'active', Gio.SettingsBindFlags.DEFAULT);
+        audio.add(autostart);
+
+        const extras = new Adw.PreferencesGroup({title: 'AI 답변·다운로드',
+            description: '다른 창에서 일하는 동안 Claude·ChatGPT 답변이 끝나면 작은 캐릭터가 튀어나오고, 그 앱으로 돌아가면 들어갑니다. 0.7 GB 이상 다운로드는 진행률 알약으로 보입니다.'});
+        page.add(extras);
+        const agent = new Adw.SwitchRow({title: 'AI 답변 완료 캐릭터', subtitle: '주황은 Claude, 하늘색은 ChatGPT입니다.'});
+        settings.bind('agent-enabled', agent, 'active', Gio.SettingsBindFlags.DEFAULT);
+        extras.add(agent);
+        const download = new Adw.SwitchRow({title: '큰 다운로드 진행률', subtitle: '다운로드 폴더의 Firefox·Chrome 임시 파일을 봅니다. 누르면 폴더가 열립니다.'});
+        settings.bind('download-enabled', download, 'active', Gio.SettingsBindFlags.DEFAULT);
+        extras.add(download);
     }
 }

@@ -3,10 +3,11 @@ import Gio from 'gi://Gio';
 import GLib from 'gi://GLib';
 import Graphene from 'gi://Graphene';
 import * as Main from 'resource:///org/gnome/shell/ui/main.js';
-import {DOCK_PROTOCOL, buttonNumber, layoutIsland, canClaim, isActorWithin, isPointWithinActor, pointInNotchShape,
-    isPointWithinNotch, classifyOutsideSurface, shouldDismissOutside, dispatchOutsideDismiss, notchGeometry} from './dockModel.js';
+import {DOCK_PROTOCOL, buttonNumber, layoutIsland, canClaim, needsGrab, isActorWithin, isPointWithinActor, pointInNotchShape,
+    isPointWithinNotch, classifyOutsideSurface, shouldDismissOutside, dispatchOutsideDismiss, notchGeometry,
+    SPRING_OPEN, SPRING_CLOSE, CONTENT_GROW_FROM, springAt, springDuration} from './dockModel.js';
 import {DESIGN} from './designTokens.js';
-import {createNotchSurface} from './notchSurface.js';
+import {createNotchSurface, NotchLayout} from './notchSurface.js';
 
 // One registry, one island per monitor and one capture-phase listener, shared by every
 // independently installed extension that ships this file (Archsport, matci, notci).
@@ -21,16 +22,17 @@ function layoutSourceHash() {
     // Geometry values are part of the contract: two builds that draw or hit-test
     // different slabs must not share one dock silently.
     const contract = [`protocol=${DOCK_PROTOCOL}`, `open=${OPEN_MS}`, `close=${CLOSE_MS}`, `micro=${MICRO_MS}`,
-        `curve=${DESIGN.motion.curve}`, JSON.stringify(DESIGN.geometry), JSON.stringify(DESIGN.radius),
+        `curve=${DESIGN.motion.curve}`, JSON.stringify([SPRING_OPEN, SPRING_CLOSE, CONTENT_GROW_FROM]), JSON.stringify(DESIGN.geometry), JSON.stringify(DESIGN.radius),
         JSON.stringify(DESIGN.material), JSON.stringify(DESIGN.spacing),
-        disconnectCapture, layoutIsland, canClaim, isActorWithin, isPointWithinActor,
-        pointInNotchShape, isPointWithinNotch, notchGeometry, createNotchSurface,
+        disconnectCapture, layoutIsland, canClaim, needsGrab, isActorWithin, isPointWithinActor,
+        pointInNotchShape, isPointWithinNotch, notchGeometry, createNotchSurface, NotchLayout,
         classifyOutsideSurface, shouldDismissOutside, dispatchOutsideDismiss,
-        eventCoordinates, buttonNumber, animationsEnabled, clearMorph, allocationFor, easeOnCurve, morph,
+        eventCoordinates, buttonNumber, animationsEnabled, clearMorph, allocationFor, easeOnCurve, springAt, springDuration,
+        springEase, morph,
         hideSlab, showSlab, slabFor, destroySlabs, attach, detach, placeContent, monitorKey, keepOnStage,
-        dismissOnFocusChange, insideActiveSurface, getDock, DockParticipant]
+        dismissOnFocusChange, dismissOnPress, onSlabCaptured, syncGrab, dropGrab, insideActiveSurface, getDock, DockParticipant]
         .map(fn => typeof fn === 'string' ? fn : fn.toString()).join('|');
-    for (const char of `${contract}|capture-dismiss-v7|island-v1`) {
+    for (const char of `${contract}|capture-dismiss-v9|island-v1|spring-v1`) {
         hash ^= char.charCodeAt(0);
         hash = Math.imul(hash, 16777619);
     }
@@ -53,13 +55,14 @@ function disconnectCapture(dock) {
 }
 
 // Giving an app window focus (click, Alt+Tab, launch) counts as tapping outside the island.
-// Focus moving to nothing is ignored: that is the island itself taking the keyboard.
+// Focus moving to nothing (the island or a Shell dialog took the keyboard) is remembered, so
+// coming back to the same window afterwards still counts as a click on it.
 function dismissOnFocusChange(dock) {
     if (dock.shuttingDown) return;
     let window = null;
     try { window = global.display.focus_window; } catch (_error) {}
     if (!window || window === dock.focusWindow) {
-        if (window) dock.focusWindow = window;
+        dock.focusWindow = window;
         return;
     }
     dock.focusWindow = window;
@@ -109,9 +112,20 @@ export function easeOnCurve(actor, params) {
         actor.get_transition(property.replaceAll('_', '-'))?.set_cubic_bezier_progress(first, second);
 }
 
+// Bounded spring ease: an ordinary transition on the spring's fitted curve for the spring's settle
+// time (<= ~0.5 s); nothing here loops.
+function springEase(actor, params, spring) {
+    const [x1, y1, x2, y2] = spring.curve;
+    actor.ease({...params, duration: springDuration(spring), mode: Clutter.AnimationMode.EASE_OUT_QUART});
+    const first = new Graphene.Point({x: x1, y: y1});
+    const second = new Graphene.Point({x: x2, y: y2});
+    for (const property of Object.keys(params).filter(key => !EASE_OPTIONS.has(key)))
+        actor.get_transition(property.replaceAll('_', '-'))?.set_cubic_bezier_progress(first, second);
+}
+
 // One transform from the current geometry, so a re-click turns back mid-flight.
-function morph(actor, target, duration, onComplete) {
-    easeOnCurve(actor, {...target, duration, onComplete});
+function morph(actor, target, spring, onComplete) {
+    springEase(actor, {...target, onComplete}, spring);
 }
 
 function hideSlab(dock, slab, animate = true) {
@@ -136,7 +150,7 @@ function hideSlab(dock, slab, animate = true) {
         // Back into the panel edge: the slab retracts to the seed sliver it grew from.
         const center = actor.x + actor.width / 2;
         morph(actor, {x: center - DESIGN.geometry.neckWidth / 2, width: DESIGN.geometry.neckWidth,
-            height: DESIGN.geometry.seedHeight}, duration, () => {
+            height: DESIGN.geometry.seedHeight}, SPRING_CLOSE, () => {
             if (dock.shuttingDown || slab.transitionId !== transitionId) return;
             slab.closing = false;
             if (!slab.island) {
@@ -176,7 +190,7 @@ function showSlab(dock, slab, island) {
             return;
         }
         const shrinking = !wasHidden && (allocation.height < actor.height || allocation.width < actor.width);
-        morph(actor, allocation, shrinking ? CLOSE_MS : duration);
+        morph(actor, allocation, shrinking ? SPRING_CLOSE : SPRING_OPEN);
     } catch (_error) {
         // A stale actor is left to Shell teardown; do not retry UI work during shutdown.
     }
@@ -189,11 +203,100 @@ function slabFor(dock, key) {
         const surface = createNotchSurface();
         Main.layoutManager.addChrome(surface, {affectsStruts: false, trackFullscreen: false});
         slab = {key, surface, holder: surface._holder, island: null, targetGeometry: null, transitionId: 0, closing: false};
+        surface.connect('captured-event', (_actor, event) => onSlabCaptured(dock, event));
+        // Under the grab the stage is not in the event chain, so St's Tab/arrow focus moves are done here.
+        surface.connect('key-press-event', (_actor, event) =>
+            dock.grab && global.focus_manager.navigate_from_event(event) ? Clutter.EVENT_STOP : Clutter.EVENT_PROPAGATE);
         dock.slabs.set(key, slab);
         return slab;
     } catch (_error) {
         return null;
     }
+}
+
+// On Wayland a press on an app window is handled by Mutter before Clutter ever queues it, so the
+// stage listener below never sees it (Mutter 50 events.c: the compositor returns STOP unless the
+// stage holds a grab). While a manually opened card is up the slab holds a Clutter grab: outside
+// presses and Esc then arrive at the slab's own captured-event, exactly like a Shell menu. The
+// dismissing click is not replayed to the app. The grab follows the island state through reflow().
+function syncGrab(dock) {
+    const owner = dock.active && dock.participants.get(dock.active.id);
+    const surface = owner && dock.active !== dock.grabRefused && needsGrab(dock.active, owner.state) ?
+        dock.slabs.get(owner.slabKey)?.surface : null;
+    const wanted = surface?.visible && !dock.shuttingDown ? surface : null;
+    if (dock.grabActor === wanted) return;
+    dropGrab(dock);
+    if (!wanted) return;
+    try {
+        // Clutter only puts reactive actors in an event chain: without this a key press aimed at a
+        // focused button inside the card never reaches the slab (Esc, Tab) while the stage is cut off.
+        dock.grabReactive = wanted.reactive;
+        wanted.reactive = true;
+        dock.grab = global.stage.grab(wanted);
+        dock.grabActor = wanted;
+    } catch (error) {
+        try { wanted.reactive = dock.grabReactive; } catch (_error) {}
+        dock.grab = dock.grabActor = null;
+        console.warn(`[notchDock] grab failed: ${error.message}`);
+    }
+}
+
+function dropGrab(dock) {
+    try { dock.grab?.dismiss(); } catch (_error) { /* stage already gone */ }
+    try {
+        if (dock.grabActor) dock.grabActor.reactive = dock.grabReactive ?? false;
+    } catch (_error) { /* actor already disposed */ }
+    dock.grab = dock.grabActor = null;
+}
+
+function onSlabCaptured(dock, event) {
+    if (!dock.grab || dock.shuttingDown) return Clutter.EVENT_PROPAGATE;
+    const type = event.type();
+    const active = dock.active;
+    let dismissed = false;
+    if (type === Clutter.EventType.KEY_PRESS && event.get_key_symbol() === Clutter.KEY_Escape) {
+        const owner = active && dock.participants.get(active.id);
+        try { owner?.onOutside?.(); } catch (error) {
+            console.warn(`[notchDock] escape dismissal failed: ${error.message}`);
+        }
+        dismissed = true;
+    } else if (type === Clutter.EventType.BUTTON_PRESS || type === Clutter.EventType.TOUCH_BEGIN) {
+        dismissed = dismissOnPress(dock, event, true);
+    }
+    if (!dismissed) return Clutter.EVENT_PROPAGATE;
+    // A module that ignores onOutside must not keep the desktop's clicks: give up the grab for this claim.
+    if (dock.grab && dock.active === active) {
+        dock.grabRefused = active;
+        dropGrab(dock);
+    }
+    return Clutter.EVENT_STOP;
+}
+
+function dismissOnPress(dock, event, grabbed) {
+    const owner = dock.active && dock.participants.get(dock.active.id);
+    if (!owner) return false;
+    const inside = insideActiveSurface(dock, owner, event) ?? {};
+    // Under the grab the owner's opener cannot receive the press anyway, so pressing it closes the card.
+    if (grabbed) inside.insideOwnerTrigger = false;
+    const expanded = owner.state.visible && owner.state.expanded;
+    // get_button() is only valid on button events; a tap counts as a primary press.
+    const touch = event.type() === Clutter.EventType.TOUCH_BEGIN;
+    const pressed = touch ? 1 : buttonNumber(event.get_button());
+    let dismissed = false;
+    try {
+        // Under the grab no outside press can reach the app (Shell menus behave the same), so any button closes.
+        dismissed = dispatchOutsideDismiss({eventType: Clutter.EventType.BUTTON_PRESS,
+            buttonPressType: Clutter.EventType.BUTTON_PRESS, active: Boolean(dock.active),
+            button: grabbed ? 1 : pressed, expanded},
+        () => owner.onOutside?.(), inside);
+        // One line per press while a card is open: enough to read a real-session failure from the journal.
+        const {x, y} = eventCoordinates(event);
+        console.log(`[notchDock] press ${Math.round(x)},${Math.round(y)} button=${pressed}${touch ? ' touch' : ''} owner=${owner.id} ` +
+            `expanded=${expanded} grab=${grabbed} inside=${JSON.stringify(inside)} dismissed=${dismissed}`);
+    } catch (error) {
+        console.warn(`[notchDock] outside dismissal failed: ${error.message}`);
+    }
+    return dismissed;
 }
 
 function monitorKey(monitor) {
@@ -213,6 +316,7 @@ function keepOnStage(dock, participant) {
 }
 
 function destroySlabs(dock) {
+    dropGrab(dock);
     for (const slab of dock.slabs.values()) {
         try { Main.layoutManager.removeChrome(slab.surface); } catch (_error) {}
         try { slab.surface.destroy(); } catch (_error) {}
@@ -248,6 +352,7 @@ function detach(participant) {
         content._notchAlign = null;
         content.get_parent()?.remove_child(content);
         content.translation_x = 0;
+        content.scale_x = content.scale_y = 1;
         content.visible = true;
         content.opacity = 255;
     } catch (_error) {}
@@ -290,6 +395,18 @@ function placeContent(dock, slab, participant, slot, island) {
                 } else {
                     content.opacity = 255;
                 }
+            }
+            // The card grows with the slab (Dynamic Island): same spring, from 96 % at the top edge.
+            if (island.expanded && !participant.wasExpanded && slabVisible && animate) {
+                content.set_pivot_point(0.5, 0);
+                content.remove_transition('scale-x');
+                content.remove_transition('scale-y');
+                content.scale_x = content.scale_y = CONTENT_GROW_FROM;
+                springEase(content, {scale_x: 1, scale_y: 1}, SPRING_OPEN);
+            } else if (!island.expanded && participant.wasExpanded) {
+                content.remove_transition('scale-x');
+                content.remove_transition('scale-y');
+                content.scale_x = content.scale_y = 1;
             }
             participant.wasExpanded = island.expanded;
         } else if (participant.shown) {
@@ -340,9 +457,11 @@ function getDock() {
         shuttingDown: false,
         captureStage: global.stage,
         captureId: 0,
+        grab: null, grabActor: null, grabRefused: null, grabReactive: false,
         shutdown() {
             if (this.shuttingDown) return;
             this.shuttingDown = true;
+            dropGrab(this);
             disconnectCapture(this);
             for (const participant of [...this.participants.values()]) {
                 try { participant.onShellShutdown?.(); } catch (_error) {}
@@ -397,28 +516,15 @@ function getDock() {
                 slab.island = null;
                 hideSlab(this, slab, true);
             }
+            syncGrab(this);
         },
     };
+    // Without a grab (toasts) only presses on Shell chrome reach the stage; the slab listener owns the rest.
     dock.captureId = dock.captureStage.connect('captured-event', (_stage, event) => {
-        if (dock.shuttingDown) return Clutter.EVENT_PROPAGATE;
+        if (dock.shuttingDown || dock.grab) return Clutter.EVENT_PROPAGATE;
         if (event.type() !== Clutter.EventType.BUTTON_PRESS) return Clutter.EVENT_PROPAGATE;
-        const owner = dock.active && dock.participants.get(dock.active.id);
-        const inside = owner ? insideActiveSurface(dock, owner, event) : null;
-        if (owner) {
-            try {
-                const dismissed = dispatchOutsideDismiss({eventType: event.type(),
-                    buttonPressType: Clutter.EventType.BUTTON_PRESS, active: Boolean(dock.active),
-                    button: buttonNumber(event.get_button()), expanded: owner.state.visible && owner.state.expanded},
-                () => owner.onOutside?.(), inside ?? {});
-                // One line per press while a card is open: enough to read a real-session failure from the journal.
-                const {x, y} = eventCoordinates(event);
-                console.log(`[notchDock] press ${Math.round(x)},${Math.round(y)} button=${buttonNumber(event.get_button())} owner=${owner.id} ` +
-                    `expanded=${owner.state.visible && owner.state.expanded} inside=${JSON.stringify(inside)} dismissed=${dismissed}`);
-            } catch (error) {
-                console.warn(`[notchDock] outside dismissal failed: ${error.message}`);
-            }
-        }
-        // The clicked app, panel, or context menu must still receive the pointer event.
+        dismissOnPress(dock, event, false);
+        // The clicked panel button or context menu must still receive the pointer event.
         return Clutter.EVENT_PROPAGATE;
     });
     dock.stageDestroyId = dock.captureStage.connect('destroy', () => dock.shutdown());
@@ -463,6 +569,8 @@ export class DockParticipant {
         this.dock.active = {id: this.id, priority};
         if (previous && previous.id !== this.id)
             this.dock.participants.get(previous.id)?.onYield?.();
+        // A same-size promotion (suggestion 30 -> review 100) skips reflow, so the grab is synced here too.
+        syncGrab(this.dock);
         return true;
     }
 

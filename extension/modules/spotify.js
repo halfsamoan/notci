@@ -2,7 +2,6 @@ import Clutter from 'gi://Clutter';
 import GdkPixbuf from 'gi://GdkPixbuf';
 import Gio from 'gi://Gio';
 import GLib from 'gi://GLib';
-import GObject from 'gi://GObject';
 import Pango from 'gi://Pango';
 import Shell from 'gi://Shell';
 import Soup from 'gi://Soup';
@@ -31,6 +30,8 @@ const PlayerProxy = Gio.DBusProxy.makeProxyWrapper(`<node><interface name="${IFA
 const APP_IDS = ['spotify.desktop', 'com.spotify.Client.desktop', 'spotify_spotify.desktop'];
 const BAR_PERIODS = [420, 560, 380, 500];
 const BAR_PAUSED = [0.4, 0.75, 1.0, 0.6];
+// ~15 fps (boring.notch's visualizer rate). See _updateBars for why this is a timer, not a transition.
+const BAR_FRAME_MS = 66;
 const ICON_SKIP = 20;
 const ICON_PLAY = 16;
 const ICON_FALLBACK = 16;
@@ -39,7 +40,7 @@ const SEEK_DEBOUNCE_MS = 300;
 const IDLE_MS = 8000;
 const POSITION_REREAD_TICKS = 5;
 const ACCENT_CACHE_MAX = 32;
-const TIMERS = ['_tick', '_peekTimer', '_seekTimer', '_closingTimer'];
+const TIMERS = ['_tick', '_peekTimer', '_seekTimer', '_closingTimer', '_barTimer'];
 
 export class SpotifyModule {
     constructor({settings, uuid, cacheDir}) {
@@ -599,27 +600,36 @@ export class SpotifyModule {
     }
 
     // Bars animate only while playing, mapped, animations on, not fullscreen, not locked.
+    // A ~15 fps timer sets scale-y directly. An infinite Clutter.PropertyTransition repaints the stage on
+    // every vsync (120 Hz on this panel): measured 2026-10-23, notci took ~12% of a core in the real
+    // session and 6% in the 60 Hz harness while music played; 15 fps cuts the frames 8x. Same motion:
+    // EASE_IN_OUT_SINE between 0.3 and 1.0, auto-reversing every BAR_PERIODS[i] ms.
     _updateBars() {
         const bars = this._ui?.bars ?? [];
-        if (!bars.length) return;
         let run = false;
         try {
-            run = this._status === 'Playing' && this.root.mapped && St.Settings.get().enable_animations &&
+            run = bars.length > 0 && this._status === 'Playing' && this.root.mapped && St.Settings.get().enable_animations &&
                 !Main.layoutManager.primaryMonitor?.inFullscreen && !Main.sessionMode.isLocked;
         } catch (_error) {}
-        bars.forEach((bar, i) => {
-            if (!run) {
-                bar.remove_transition('wave');
-                bar.scale_y = BAR_PAUSED[i];
-                return;
-            }
-            if (bar.get_transition('wave')) return;
-            const wave = new Clutter.PropertyTransition({property_name: 'scale-y',
-                interval: new Clutter.Interval({value_type: GObject.TYPE_DOUBLE}), duration: BAR_PERIODS[i],
-                repeat_count: -1, auto_reverse: true, progress_mode: Clutter.AnimationMode.EASE_IN_OUT_SINE});
-            wave.set_from(0.3);
-            wave.set_to(1.0);
-            bar.add_transition('wave', wave);
+        if (!run) {
+            this._clearTimer('_barTimer');
+            bars.forEach((bar, i) => { bar.scale_y = BAR_PAUSED[i]; });
+            return;
+        }
+        if (this._barTimer) return;
+        const start = GLib.get_monotonic_time();
+        const step = () => {
+            const elapsed = (GLib.get_monotonic_time() - start) / 1000;
+            (this._ui?.bars ?? []).forEach((bar, i) => {
+                const phase = (elapsed / BAR_PERIODS[i]) % 2;
+                const progress = phase < 1 ? phase : 2 - phase;
+                bar.scale_y = 0.3 + 0.7 * (1 - Math.cos(Math.PI * progress)) / 2;
+            });
+        };
+        step();
+        this._barTimer = GLib.timeout_add(GLib.PRIORITY_DEFAULT, BAR_FRAME_MS, () => {
+            step();
+            return GLib.SOURCE_CONTINUE;
         });
     }
 }

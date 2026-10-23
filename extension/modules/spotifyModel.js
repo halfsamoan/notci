@@ -20,11 +20,15 @@ export function positionAt({positionUs = 0, atUs = 0, playing = false, lengthUs 
     return lengthUs > 0 ? Math.min(position, lengthUs) : position;
 }
 
-// Spotify CDN image ids encode the size in their prefix: b273 = 640, 1e02 = 300, 4851 = 64.
-export function artVariantUrl(url, scale = 1) {
+// Spotify CDN image ids encode the size in their prefix: b273 = 640, 1e02 = 300, 4851 = 64. The rest is a
+// 24-hex id (checked against live MPRIS artUrl 2026-10-23; the old {32} never matched, so 640 px was always fetched).
+// Always the 300 px variant: the card art is 64 logical px, and with fractional scaling (1.67 here)
+// St reports scale_factor 1 while it draws ~107 physical px, so 64 px would be blurry. 300 px is
+// 0.36 MB as a texture instead of 1.6 MB for 640 px.
+export function artVariantUrl(url, _scale = 1) {
     if (typeof url !== 'string') return '';
     return url.replace(/^https:\/\/open\.spotify\.com\/image\//, 'https://i.scdn.co/image/')
-        .replace(/ab67616d0000b273([0-9a-f]{32})$/, (_match, id) => `${scale > 1 ? 'ab67616d00001e02' : 'ab67616d00004851'}${id}`);
+        .replace(/ab67616d0000b273([0-9a-f]{24})$/, (_match, id) => `ab67616d00001e02${id}`);
 }
 
 const channel = value => {
