@@ -80,3 +80,17 @@ test('slab morphs ride a spring: growing overshoots ~2 % and settles, shrinking 
     const curvePeak = Math.max(...Array.from({length: 101}, (_, i) => bezier(SPRING_OPEN.curve, i / 100)));
     assert.ok(curvePeak > 1.01 && curvePeak <= 1.025, `open curve peak ${curvePeak}`);
 });
+
+test('a closing slab stays a rounded drop down to the seed: no square-cornered frames', async () => {
+    const {notchGeometry, SLAB_FADE_MS, SPRING_CLOSE, springDuration} = await import('../extension/dockModel.js');
+    // Compact and card shapes are unchanged.
+    assert.deepEqual(notchGeometry(36, 292), {ear: 6, radius: 16, sliver: false});
+    assert.deepEqual(notchGeometry(146, 492), {ear: 14, radius: 22, sliver: false});
+    // v32 drew every height of 10 px or less as a plain rectangle for the last ~90 ms of a close.
+    for (let height = 2; height < 36; height++) {
+        const {ear, radius, sliver} = notchGeometry(height, 104);
+        assert.equal(sliver, false, `${height} px`);
+        assert.ok(radius >= 1 && ear >= 1 && ear + radius <= height, `${height} px: ear ${ear} r ${radius}`);
+    }
+    assert.ok(SLAB_FADE_MS > 0 && SLAB_FADE_MS < springDuration(SPRING_CLOSE) / 2);
+});

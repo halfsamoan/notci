@@ -5,7 +5,7 @@ import Graphene from 'gi://Graphene';
 import * as Main from 'resource:///org/gnome/shell/ui/main.js';
 import {DOCK_PROTOCOL, buttonNumber, layoutIsland, canClaim, needsGrab, isActorWithin, isPointWithinActor, pointInNotchShape,
     isPointWithinNotch, classifyOutsideSurface, shouldDismissOutside, dispatchOutsideDismiss, notchGeometry,
-    SPRING_OPEN, SPRING_CLOSE, CONTENT_GROW_FROM, springAt, springDuration} from './dockModel.js';
+    SPRING_OPEN, SPRING_CLOSE, CONTENT_GROW_FROM, SLAB_FADE_MS, springAt, springDuration} from './dockModel.js';
 import {DESIGN} from './designTokens.js';
 import {createNotchSurface, NotchLayout} from './notchSurface.js';
 
@@ -22,7 +22,7 @@ function layoutSourceHash() {
     // Geometry values are part of the contract: two builds that draw or hit-test
     // different slabs must not share one dock silently.
     const contract = [`protocol=${DOCK_PROTOCOL}`, `open=${OPEN_MS}`, `close=${CLOSE_MS}`, `micro=${MICRO_MS}`,
-        `curve=${DESIGN.motion.curve}`, JSON.stringify([SPRING_OPEN, SPRING_CLOSE, CONTENT_GROW_FROM]), JSON.stringify(DESIGN.geometry), JSON.stringify(DESIGN.radius),
+        `curve=${DESIGN.motion.curve}`, JSON.stringify([SPRING_OPEN, SPRING_CLOSE, CONTENT_GROW_FROM, SLAB_FADE_MS]), JSON.stringify(DESIGN.geometry), JSON.stringify(DESIGN.radius),
         JSON.stringify(DESIGN.material), JSON.stringify(DESIGN.spacing),
         disconnectCapture, layoutIsland, canClaim, needsGrab, isActorWithin, isPointWithinActor,
         pointInNotchShape, isPointWithinNotch, notchGeometry, createNotchSurface, NotchLayout,
@@ -158,6 +158,9 @@ function hideSlab(dock, slab, animate = true) {
             }
             try { actor.opacity = 255; } catch (_error) {}
         });
+        // The drop fades over the close's last frames instead of popping off at seed size.
+        actor.ease({opacity: 0, duration: SLAB_FADE_MS, delay: Math.max(0, springDuration(SPRING_CLOSE) - SLAB_FADE_MS),
+            mode: Clutter.AnimationMode.LINEAR});
     } catch (_error) {
         slab.closing = false;
         try { actor.visible = false; } catch (_ignored) {}

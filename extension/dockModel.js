@@ -8,9 +8,14 @@ export const SNAP = 8;
 // sides, rounded bottom. Ears grow with height; low slabs get a smaller radius.
 export function notchGeometry(height, width = Infinity) {
     const {earMin, earMax} = DESIGN.geometry;
-    const ear = Math.max(0, Math.min(earMax, Math.max(earMin, Math.round(height * 0.1)), Math.floor(width / 4)));
+    // Below the compact height (only while growing from or retracting into the panel) the ears shrink
+    // with the slab, so it stays a rounded drop. A fixed 6 px ear made the last ~90 ms of a close a
+    // square-cornered bar (frame-by-frame check, 2026-10-24).
+    const compact = DESIGN.control.compactHeight;
+    const floor = height >= compact ? earMin : Math.max(1, Math.round(earMin * height / compact));
+    const ear = Math.max(0, Math.min(earMax, Math.max(floor, Math.round(height * 0.1)), Math.floor(width / 4)));
     const radius = Math.max(0, Math.min(DESIGN.radius.surface, Math.round(height * 0.45), height - ear));
-    return {ear, radius, sliver: height <= ear + 4 || radius < 1};
+    return {ear, radius, sliver: radius < 1};
 }
 
 export function buttonNumber(result) {
@@ -34,8 +39,10 @@ export function needsGrab(active, state, threshold = GRAB_PRIORITY) {
 // island's values. GJS cannot drive a Clutter progress function on Mutter 50 (the callback runs but
 // its return value is ignored; harness 2026-10-24), so each spring ships as the cubic-bezier that
 // tracks it within 2.5% over springDuration(), overshoot capped at 2.5% (fitted offline, checked in tests/dock.test.mjs).
-export const SPRING_OPEN = {response: 0.45, damping: 0.78, curve: [0.3, 0.35, 0.1, 1.16]};
-export const SPRING_CLOSE = {response: 0.32, damping: 1, curve: [0.25, 0.3, 0.15, 0.98]};
+export const SPRING_OPEN = {response: 0.44, damping: 0.78, curve: [0.3, 0.35, 0.1, 1.16]};
+export const SPRING_CLOSE = {response: 0.31, damping: 1, curve: [0.2, 0.1, 0.1, 1]};
+// A full close fades the slab over its last frames, so the retracting drop never pops off.
+export const SLAB_FADE_MS = 110;
 export const CONTENT_GROW_FROM = 0.96;
 
 export function springAt(t, {response, damping}) {
