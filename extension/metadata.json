@@ -5,7 +5,7 @@
   "shell-version": [
     "50"
   ],
-  "version": 12,
+  "version": 13,
   "settings-schema": "org.gnome.shell.extensions.notci",
   "session-modes": [
     "user"

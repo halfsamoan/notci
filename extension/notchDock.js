@@ -2,10 +2,12 @@ import Clutter from 'gi://Clutter';
 import Gio from 'gi://Gio';
 import GLib from 'gi://GLib';
 import Graphene from 'gi://Graphene';
+import Meta from 'gi://Meta';
 import * as Main from 'resource:///org/gnome/shell/ui/main.js';
 import {DOCK_PROTOCOL, buttonNumber, layoutIsland, canClaim, needsGrab, isActorWithin, isPointWithinActor, pointInNotchShape,
     isPointWithinNotch, classifyOutsideSurface, shouldDismissOutside, dispatchOutsideDismiss, notchGeometry,
-    SPRING_OPEN, SPRING_CLOSE, CONTENT_GROW_FROM, SLAB_FADE_MS, springAt, springDuration} from './dockModel.js';
+    SPRING_OPEN, SPRING_CLOSE, CONTENT_GROW_FROM, CONTENT_SHRINK_TO, CLOSE_OUT_MS, CLOSE_IN_MS, SLAB_FADE,
+    springAt, springDuration} from './dockModel.js';
 import {DESIGN} from './designTokens.js';
 import {createNotchSurface, NotchLayout} from './notchSurface.js';
 
@@ -22,17 +24,17 @@ function layoutSourceHash() {
     // Geometry values are part of the contract: two builds that draw or hit-test
     // different slabs must not share one dock silently.
     const contract = [`protocol=${DOCK_PROTOCOL}`, `open=${OPEN_MS}`, `close=${CLOSE_MS}`, `micro=${MICRO_MS}`,
-        `curve=${DESIGN.motion.curve}`, JSON.stringify([SPRING_OPEN, SPRING_CLOSE, CONTENT_GROW_FROM, SLAB_FADE_MS]), JSON.stringify(DESIGN.geometry), JSON.stringify(DESIGN.radius),
+        `curve=${DESIGN.motion.curve}`, JSON.stringify([SPRING_OPEN, SPRING_CLOSE, CONTENT_GROW_FROM, CONTENT_SHRINK_TO, CLOSE_OUT_MS, CLOSE_IN_MS, SLAB_FADE]), JSON.stringify(DESIGN.geometry), JSON.stringify(DESIGN.radius),
         JSON.stringify(DESIGN.material), JSON.stringify(DESIGN.spacing),
         disconnectCapture, layoutIsland, canClaim, needsGrab, isActorWithin, isPointWithinActor,
         pointInNotchShape, isPointWithinNotch, notchGeometry, createNotchSurface, NotchLayout,
         classifyOutsideSurface, shouldDismissOutside, dispatchOutsideDismiss,
         eventCoordinates, buttonNumber, animationsEnabled, clearMorph, allocationFor, easeOnCurve, springAt, springDuration,
-        springEase, morph,
+        springEase, morph, closeEase, afterDispatch, traceClose,
         hideSlab, showSlab, slabFor, destroySlabs, attach, detach, placeContent, monitorKey, keepOnStage,
         dismissOnFocusChange, dismissOnPress, onSlabCaptured, syncGrab, dropGrab, insideActiveSurface, getDock, DockParticipant]
         .map(fn => typeof fn === 'string' ? fn : fn.toString()).join('|');
-    for (const char of `${contract}|capture-dismiss-v9|island-v1|spring-v1`) {
+    for (const char of `${contract}|capture-dismiss-v9|island-v1|spring-v1|close-v2`) {
         hash ^= char.charCodeAt(0);
         hash = Math.imul(hash, 16777619);
     }
@@ -128,6 +130,48 @@ function morph(actor, target, spring, onComplete) {
     springEase(actor, {...target, onComplete}, spring);
 }
 
+// Outgoing and incoming content ride the close spring's curve for their share of the close.
+export function closeEase(actor, params, duration = CLOSE_OUT_MS) {
+    const [x1, y1, x2, y2] = SPRING_CLOSE.curve;
+    actor.ease({...params, duration, mode: Clutter.AnimationMode.EASE_OUT_QUART});
+    const first = new Graphene.Point({x: x1, y: y1});
+    const second = new Graphene.Point({x: x2, y: y2});
+    for (const property of Object.keys(params).filter(key => !EASE_OPTIONS.has(key)))
+        actor.get_transition(property.replaceAll('_', '-'))?.set_cubic_bezier_progress(first, second);
+}
+
+// A close started inside Clutter's event dispatch (Esc, an outside press, a button under the grab) runs
+// after it, at the next BEFORE_REDRAW. In the real session (screen cast, 2026-10-25) those closes put up
+// their first frame ~185 ms after their handler had run, while the same close from the global shortcut
+// (Mutter keybinding, outside actor dispatch) painted within 20 ms; the headless harness never showed the
+// gap. The cause is not pinned down; this keeps every path off the dispatch stack. traceClose() logs
+// whether it helped.
+export function afterDispatch(dock, fn) {
+    try {
+        global.compositor.get_laters().add(Meta.LaterType.BEFORE_REDRAW, () => {
+            if (!dock.shuttingDown) fn();
+            return GLib.SOURCE_REMOVE;
+        });
+    } catch (_error) {
+        fn();
+    }
+}
+
+// Two journal lines per close: when the retract starts and when its first frame is painted, with the
+// transition's own elapsed time, so a real session can be read without instrumentation.
+function traceClose(slab, label) {
+    const actor = slab.surface;
+    const t0 = GLib.get_monotonic_time();
+    const id = global.stage.connect('after-paint', () => {
+        global.stage.disconnect(id);
+        let transition = null;
+        try { transition = actor.get_transition('height'); } catch (_error) {}
+        console.log(`[notchDock] ${label} first frame +${((GLib.get_monotonic_time() - t0) / 1000).toFixed(1)} ms ` +
+            `(transition ${transition ? transition.get_elapsed_time() : '-'} ms) ${Math.round(actor.width)}x${Math.round(actor.height)}`);
+    });
+    console.log(`[notchDock] ${label} start ${Math.round(actor.width)}x${Math.round(actor.height)}`);
+}
+
 function hideSlab(dock, slab, animate = true) {
     const actor = slab.surface;
     if (!actor || dock.shuttingDown) return;
@@ -158,9 +202,10 @@ function hideSlab(dock, slab, animate = true) {
             }
             try { actor.opacity = 255; } catch (_error) {}
         });
-        // The drop fades over the close's last frames instead of popping off at seed size.
-        actor.ease({opacity: 0, duration: SLAB_FADE_MS, delay: Math.max(0, springDuration(SPRING_CLOSE) - SLAB_FADE_MS),
-            mode: Clutter.AnimationMode.LINEAR});
+        // The drop fades out through the middle of the retract: gone before it is thin enough to
+        // read as a bar, never a pop at seed size.
+        actor.ease({opacity: 0, duration: SLAB_FADE.duration, delay: SLAB_FADE.delay, mode: Clutter.AnimationMode.LINEAR});
+        traceClose(slab, 'retract');
     } catch (_error) {
         slab.closing = false;
         try { actor.visible = false; } catch (_ignored) {}
@@ -194,6 +239,7 @@ function showSlab(dock, slab, island) {
         }
         const shrinking = !wasHidden && (allocation.height < actor.height || allocation.width < actor.width);
         morph(actor, allocation, shrinking ? SPRING_CLOSE : SPRING_OPEN);
+        if (shrinking) traceClose(slab, 'shrink');
     } catch (_error) {
         // A stale actor is left to Shell teardown; do not retry UI work during shutdown.
     }
@@ -259,9 +305,11 @@ function onSlabCaptured(dock, event) {
     let dismissed = false;
     if (type === Clutter.EventType.KEY_PRESS && event.get_key_symbol() === Clutter.KEY_Escape) {
         const owner = active && dock.participants.get(active.id);
-        try { owner?.onOutside?.(); } catch (error) {
-            console.warn(`[notchDock] escape dismissal failed: ${error.message}`);
-        }
+        afterDispatch(dock, () => {
+            try { owner?.onOutside?.(); } catch (error) {
+                console.warn(`[notchDock] escape dismissal failed: ${error.message}`);
+            }
+        });
         dismissed = true;
     } else if (type === Clutter.EventType.BUTTON_PRESS || type === Clutter.EventType.TOUCH_BEGIN) {
         dismissed = dismissOnPress(dock, event, true);
@@ -291,7 +339,7 @@ function dismissOnPress(dock, event, grabbed) {
         dismissed = dispatchOutsideDismiss({eventType: Clutter.EventType.BUTTON_PRESS,
             buttonPressType: Clutter.EventType.BUTTON_PRESS, active: Boolean(dock.active),
             button: grabbed ? 1 : pressed, expanded},
-        () => owner.onOutside?.(), inside);
+        () => afterDispatch(dock, () => owner.onOutside?.()), inside);
         // One line per press while a card is open: enough to read a real-session failure from the journal.
         const {x, y} = eventCoordinates(event);
         console.log(`[notchDock] press ${Math.round(x)},${Math.round(y)} button=${pressed}${touch ? ' touch' : ''} owner=${owner.id} ` +
@@ -378,10 +426,11 @@ function placeContent(dock, slab, participant, slot, island) {
         if (show) {
             content.translation_x = slot.x + slot.width / 2 - island.width / 2;
             const fit = () => content.set_size(slot.width, island.height);
-            // Only a collapse keeps the old size until the expanded content has faded, so it is not reflowed.
+            // Only a collapse keeps the old size until the expanded content has gone, so it is not reflowed
+            // while it fades and shrinks.
             const collapsing = participant.shown && participant.wasExpanded && !island.expanded && slabVisible && animate;
             if (collapsing) {
-                participant.fitSource = GLib.timeout_add(GLib.PRIORITY_DEFAULT, MICRO_MS, () => {
+                participant.fitSource = GLib.timeout_add(GLib.PRIORITY_DEFAULT, CLOSE_OUT_MS, () => {
                     participant.fitSource = 0;
                     if (!participant.disposed && participant.fadeId === fadeId) fit();
                     return GLib.SOURCE_REMOVE;
@@ -391,12 +440,22 @@ function placeContent(dock, slab, participant, slot, island) {
             }
             if (!participant.shown) {
                 content.remove_transition('opacity');
+                content.remove_transition('scale-x');
+                content.remove_transition('scale-y');
                 content.visible = true;
-                if (slabVisible && animate) {
+                if (slabVisible && animate && !island.expanded) {
+                    // Into a slab that is still morphing: grows in once the slab is near its size.
+                    content.set_pivot_point(0.5, 0.5);
                     content.opacity = 0;
+                    content.scale_x = content.scale_y = CONTENT_GROW_FROM;
+                    easeOnCurve(content, {opacity: 255, scale_x: 1, scale_y: 1, duration: CLOSE_IN_MS, delay: CLOSE_OUT_MS});
+                } else if (slabVisible && animate) {
+                    content.opacity = 0;
+                    content.scale_x = content.scale_y = 1;
                     easeOnCurve(content, {opacity: 255, duration: MICRO_MS, delay: MICRO_MS});
                 } else {
                     content.opacity = 255;
+                    content.scale_x = content.scale_y = 1;
                 }
             }
             // The card grows with the slab (Dynamic Island): same spring, from 96 % at the top edge.
@@ -414,17 +473,24 @@ function placeContent(dock, slab, participant, slot, island) {
             participant.wasExpanded = island.expanded;
         } else if (participant.shown) {
             content.remove_transition('opacity');
+            content.remove_transition('scale-x');
+            content.remove_transition('scale-y');
             if (slabVisible && animate) {
-                easeOnCurve(content, {opacity: 0, duration: MICRO_MS, onComplete: () => {
+                // Leaves with the slab: fades and shrinks towards the panel edge while the retracting
+                // slab clips it, instead of vanishing in one frame.
+                content.set_pivot_point(0.5, 0);
+                closeEase(content, {opacity: 0, scale_x: CONTENT_SHRINK_TO, scale_y: CONTENT_SHRINK_TO, onComplete: () => {
                     if (participant.disposed || participant.fadeId !== fadeId) return;
                     try {
                         content.visible = false;
                         content.opacity = 255;
+                        content.scale_x = content.scale_y = 1;
                     } catch (_error) {}
                 }});
             } else {
                 content.visible = false;
                 content.opacity = 255;
+                content.scale_x = content.scale_y = 1;
             }
             participant.wasExpanded = false;
         } else {
@@ -479,7 +545,8 @@ function getDock() {
                 participant.lastFallback = false;
                 if (!monitor || !participant.state.visible) {
                     keepOnStage(this, participant);
-                    placeContent(this, null, participant, null, null);
+                    // With its slab: content leaving a visible island fades with the retract.
+                    placeContent(this, this.slabs.get(participant.slabKey) ?? null, participant, null, null);
                     continue;
                 }
                 const key = monitorKey(monitor);

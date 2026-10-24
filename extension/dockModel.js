@@ -41,8 +41,6 @@ export function needsGrab(active, state, threshold = GRAB_PRIORITY) {
 // tracks it within 2.5% over springDuration(), overshoot capped at 2.5% (fitted offline, checked in tests/dock.test.mjs).
 export const SPRING_OPEN = {response: 0.44, damping: 0.78, curve: [0.3, 0.35, 0.1, 1.16]};
 export const SPRING_CLOSE = {response: 0.31, damping: 1, curve: [0.2, 0.1, 0.1, 1]};
-// A full close fades the slab over its last frames, so the retracting drop never pops off.
-export const SLAB_FADE_MS = 110;
 export const CONTENT_GROW_FROM = 0.96;
 
 export function springAt(t, {response, damping}) {
@@ -61,6 +59,20 @@ export function springDuration(spring, epsilon = 0.005) {
     return Math.ceil(last);
 }
 
+
+// One close is one choreography on the close spring (frame-by-frame screen cast, 2026-10-25): the
+// outgoing content fades and shrinks to CONTENT_SHRINK_TO over the first CLOSE_OUT_MS, clipped by the
+// retracting slab; whatever shows afterwards (the compact row, a neighbour's pill) grows in from
+// CONTENT_GROW_FROM over the remaining CLOSE_IN_MS, when the slab is already near its size; a slab
+// retracting out of sight fades between 35 % and 80 % of the spring, so it is gone before it is thin
+// enough to read as a bar. v33 hid the content in one frame (an empty slab then shrank for 250 ms),
+// showed incoming content at 100 ms in a slab still 2-3x too large, and faded only the last 110 ms of
+// a 6 px sliver, which popped off.
+const CLOSE_TOTAL_MS = springDuration(SPRING_CLOSE);
+export const CLOSE_OUT_MS = Math.round(CLOSE_TOTAL_MS * 0.55);
+export const CLOSE_IN_MS = CLOSE_TOTAL_MS - CLOSE_OUT_MS;
+export const CONTENT_SHRINK_TO = 0.9;
+export const SLAB_FADE = {delay: Math.round(CLOSE_TOTAL_MS * 0.35), duration: Math.round(CLOSE_TOTAL_MS * 0.45)};
 
 export function isActorWithin(source, ancestor) {
     if (!source || !ancestor) return false;

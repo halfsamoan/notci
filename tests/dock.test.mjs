@@ -82,7 +82,7 @@ test('slab morphs ride a spring: growing overshoots ~2 % and settles, shrinking 
 });
 
 test('a closing slab stays a rounded drop down to the seed: no square-cornered frames', async () => {
-    const {notchGeometry, SLAB_FADE_MS, SPRING_CLOSE, springDuration} = await import('../extension/dockModel.js');
+    const {notchGeometry, SLAB_FADE, CLOSE_OUT_MS, CLOSE_IN_MS, SPRING_CLOSE, springDuration} = await import('../extension/dockModel.js');
     // Compact and card shapes are unchanged.
     assert.deepEqual(notchGeometry(36, 292), {ear: 6, radius: 16, sliver: false});
     assert.deepEqual(notchGeometry(146, 492), {ear: 14, radius: 22, sliver: false});
@@ -92,5 +92,11 @@ test('a closing slab stays a rounded drop down to the seed: no square-cornered f
         assert.equal(sliver, false, `${height} px`);
         assert.ok(radius >= 1 && ear >= 1 && ear + radius <= height, `${height} px: ear ${ear} r ${radius}`);
     }
-    assert.ok(SLAB_FADE_MS > 0 && SLAB_FADE_MS < springDuration(SPRING_CLOSE) / 2);
+    // v34: the slab fades out through the middle of the retract and the content hand-over splits the
+    // spring 55/45, so nothing thinner than ~15 px is ever drawn at full opacity.
+    const total = springDuration(SPRING_CLOSE);
+    assert.ok(SLAB_FADE.delay >= total * 0.3 && SLAB_FADE.delay + SLAB_FADE.duration <= total * 0.85,
+        `slab fade ${SLAB_FADE.delay}+${SLAB_FADE.duration} of ${total}`);
+    assert.equal(CLOSE_OUT_MS + CLOSE_IN_MS, total);
+    assert.ok(CLOSE_OUT_MS > total / 2 && CLOSE_OUT_MS < total * 0.6, `out ${CLOSE_OUT_MS} of ${total}`);
 });
