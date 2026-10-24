@@ -18,10 +18,12 @@ export default class Notci extends Extension {
         this._settings = this.getSettings();
         GLib.mkdir_with_parents(CACHE_DIR, 0o700);
         // The top bar goes pure black too, so the island reads as one piece with it (Mac notch /
-        // Dynamic Island). An inline style outranks the theme's !important; disable() restores it,
-        // and the lock screen never sees it because this extension runs in the user session only.
+        // Dynamic Island). Yaru dark declares `#panel { background-color: #131313 !important }`; the
+        // inline style is marked !important as well and stylesheet.css repeats the rule, because the
+        // plain inline left the real panel at #131313 (2026-10-25). disable() restores the style, and
+        // the lock screen never sees it because this extension runs in the user session only.
         this._panelStyle = Main.panel.get_style();
-        Main.panel.set_style(`background-color: ${DESIGN.color.surfacePrimary};`);
+        Main.panel.set_style(`background-color: ${DESIGN.color.surfacePrimary} !important; transition-duration: 0ms;`);
         const context = {settings: this._settings, uuid: this.uuid, path: this.path, cacheDir: CACHE_DIR};
         this._spotify = new SpotifyModule(context);
         this._kakao = new KakaoModule(context);

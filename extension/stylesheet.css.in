@@ -1,4 +1,11 @@
 /* notci: shared island content classes. The slab itself is drawn by notchSurface.js. */
+
+/* The top bar is the island's own surface: pure black like the slab. Yaru dark ends with
+   `#panel { background-color: #131313 !important }`, and in the real session (2026-10-25 screen cast)
+   the panel stayed #131313 next to a #000 slab although extension.js sets the inline style. This later
+   !important rule and the inline style cover both cascades; no transition, so the colour cannot stall
+   half-way between the theme's and ours. */
+#panel { background-color: {{color.surfacePrimary}} !important; transition-duration: 0ms !important; }
 .notci-module { font-family: '{{typography.family}}'; color: {{color.labelPrimary}}; background-color: transparent; }
 .notci-module StLabel, .notci-module StButton { font-family: '{{typography.family}}'; }
 
